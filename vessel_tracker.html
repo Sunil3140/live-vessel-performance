@@ -1,0 +1,1163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MarineLink | Vessel Performance Dashboard</title>
+    
+    <!-- Fonts and Icons -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Roboto+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Plotly.js CDN -->
+    <script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
+    
+    <style>
+        :root {
+            --bg-base: #060b11;
+            --bg-sidebar: #0b131e;
+            --bg-card: #111d2c;
+            --border-color: #1a2c3f;
+            --text-primary: #e2e8f0;
+            --text-secondary: #64748b;
+            --text-dim: #475569;
+            
+            --accent-cyan: #00e5ff;
+            --accent-green: #00e676;
+            --accent-yellow: #ffd600;
+            --accent-orange: #ff9100;
+            --accent-red: #ff1744;
+            --accent-purple: #e040fb;
+            
+            --panel-width: 380px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-base);
+            color: var(--text-primary);
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+        }
+
+        /* Scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: var(--bg-sidebar);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--text-secondary);
+        }
+
+        /* Sidebar Container */
+        .sidebar {
+            width: var(--panel-width);
+            background-color: var(--bg-sidebar);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            z-index: 10;
+            overflow-y: auto;
+            flex-shrink: 0;
+            box-shadow: 10px 0 30px rgba(0, 0, 0, 0.5);
+        }
+
+        .sidebar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+        }
+
+        .logo {
+            font-size: 1.2rem;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .logo i {
+            color: var(--accent-cyan);
+            text-shadow: 0 0 10px rgba(0, 229, 255, 0.4);
+        }
+
+        .system-status {
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: var(--accent-green);
+            background-color: rgba(0, 230, 118, 0.1);
+            padding: 4px 8px;
+            border-radius: 12px;
+            border: 1px solid rgba(0, 230, 118, 0.2);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .status-dot {
+            width: 6px;
+            height: 6px;
+            background-color: var(--accent-green);
+            border-radius: 50%;
+        }
+
+        .pulsing {
+            animation: pulse-dot 2s infinite;
+        }
+
+        @keyframes pulse-dot {
+            0% { transform: scale(0.95); opacity: 0.5; }
+            50% { transform: scale(1.2); opacity: 1; box-shadow: 0 0 8px var(--accent-green); }
+            100% { transform: scale(0.95); opacity: 0.5; }
+        }
+
+        /* Vessel State Header Card */
+        .vessel-card {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .vessel-icon-wrapper {
+            width: 48px;
+            height: 48px;
+            background-color: rgba(0, 229, 255, 0.1);
+            border: 1px solid rgba(0, 229, 255, 0.2);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.4rem;
+            color: var(--accent-cyan);
+        }
+
+        .vessel-meta {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .vessel-name {
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .vessel-status-text {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            margin-top: 2px;
+        }
+
+        /* KPI Dashboard Grid */
+        .section-title {
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: var(--text-secondary);
+            letter-spacing: 0.08em;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .section-title i {
+            color: var(--accent-cyan);
+        }
+
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .kpi-card {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 12px;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .kpi-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 3px;
+            height: 100%;
+            background-color: var(--text-dim);
+        }
+
+        .kpi-card.power::before { background-color: var(--accent-red); }
+        .kpi-card.rpm::before { background-color: var(--accent-orange); }
+        .kpi-card.speed::before { background-color: var(--accent-green); }
+        .kpi-card.heading::before { background-color: var(--accent-purple); }
+
+        .kpi-label {
+            font-size: 0.65rem;
+            color: var(--text-secondary);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .kpi-value-row {
+            display: flex;
+            align-items: baseline;
+            margin-top: 4px;
+        }
+
+        .kpi-value {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: #f8fafc;
+            font-family: 'Roboto Mono', monospace;
+        }
+
+        .kpi-unit {
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            margin-left: 4px;
+            font-weight: 500;
+        }
+
+        /* Voyage Summary Stats */
+        .voyage-summary {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+
+        .summary-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(26, 44, 63, 0.5);
+            font-size: 0.8rem;
+        }
+
+        .summary-row:last-child {
+            border-bottom: none;
+            padding-bottom: 0;
+        }
+
+        .summary-row:first-child {
+            padding-top: 0;
+        }
+
+        .summary-label {
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        .summary-value {
+            font-weight: 600;
+            font-family: 'Roboto Mono', monospace;
+            color: var(--text-primary);
+        }
+
+        /* GPS Status Panel */
+        .gps-panel {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 12px 15px;
+            margin-bottom: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .gps-coord-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.8rem;
+        }
+
+        .gps-coord-label {
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        .gps-coord-val {
+            font-family: 'Roboto Mono', monospace;
+            font-weight: 600;
+            color: var(--accent-cyan);
+        }
+
+        /* User Controls & Selects */
+        .control-group {
+            margin-bottom: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .control-label {
+            font-size: 0.7rem;
+            font-weight: 700;
+            color: var(--text-secondary);
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+        }
+
+        select {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-primary);
+            padding: 10px;
+            font-size: 0.85rem;
+            outline: none;
+            cursor: pointer;
+            transition: border-color 0.2s, box-shadow 0.2s;
+            font-family: 'Inter', sans-serif;
+            font-weight: 500;
+        }
+
+        select:focus {
+            border-color: var(--accent-cyan);
+            box-shadow: 0 0 8px rgba(0, 229, 255, 0.2);
+        }
+
+        /* Main Workspace Container */
+        .main-workspace {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        /* Map area */
+        .map-container {
+            flex-grow: 1;
+            width: 100%;
+            height: 100%;
+            background-color: var(--bg-base);
+            position: relative;
+        }
+
+        #map-plot {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Floating Overlay Controls on Map */
+        .map-overlay-title {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(11, 19, 30, 0.85);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 12px 18px;
+            z-index: 5;
+            pointer-events: none;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        }
+
+        .map-overlay-title h1 {
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            letter-spacing: 0.02em;
+        }
+
+        .map-overlay-title p {
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+
+        /* Bottom Animation Control Bar */
+        .playback-bar {
+            background-color: var(--bg-sidebar);
+            border-top: 1px solid var(--border-color);
+            padding: 15px 25px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            z-index: 10;
+            box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.5);
+        }
+
+        .slider-row {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .time-display {
+            font-family: 'Roboto Mono', monospace;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            min-width: 75px;
+            text-align: center;
+            background: rgba(26, 44, 63, 0.4);
+            border: 1px solid var(--border-color);
+            padding: 4px 8px;
+            border-radius: 4px;
+        }
+
+        .scrubber-container {
+            flex-grow: 1;
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        /* Range Input Scrubber */
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: var(--border-color);
+            outline: none;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--accent-cyan);
+            border: 2px solid #ffffff;
+            box-shadow: 0 0 8px var(--accent-cyan);
+            cursor: pointer;
+            transition: transform 0.1s, background-color 0.2s;
+        }
+
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+            background: #ffffff;
+        }
+
+        .controls-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .playback-buttons {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .btn {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 8px 16px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn:hover {
+            background-color: var(--border-color);
+            border-color: var(--text-secondary);
+        }
+
+        .btn.btn-play {
+            background-color: rgba(0, 230, 118, 0.1);
+            border-color: rgba(0, 230, 118, 0.2);
+            color: var(--accent-green);
+        }
+
+        .btn.btn-play:hover {
+            background-color: var(--accent-green);
+            color: var(--bg-base);
+            box-shadow: 0 0 15px rgba(0, 230, 118, 0.4);
+            border-color: var(--accent-green);
+        }
+
+        .btn.btn-pause {
+            background-color: rgba(255, 145, 0, 0.1);
+            border-color: rgba(255, 145, 0, 0.2);
+            color: var(--accent-orange);
+        }
+
+        .btn.btn-pause:hover {
+            background-color: var(--accent-orange);
+            color: var(--bg-base);
+            box-shadow: 0 0 15px rgba(255, 145, 0, 0.4);
+            border-color: var(--accent-orange);
+        }
+
+        .speed-control {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .speed-control span {
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+        }
+
+        .speed-badge {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-family: 'Roboto Mono', monospace;
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: var(--accent-cyan);
+            min-width: 60px;
+            text-align: center;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 900px) {
+            body {
+                flex-direction: column;
+            }
+            .sidebar {
+                width: 100%;
+                height: 45vh;
+                border-right: none;
+                border-bottom: 1px solid var(--border-color);
+            }
+            .main-workspace {
+                height: 55vh;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Sidebar performance console -->
+    <div class="sidebar">
+        
+        <div class="sidebar-header">
+            <div class="logo">
+                <i class="fa-solid fa-anchor"></i> MARINE LINK
+            </div>
+            <div class="system-status">
+                <span class="status-dot pulsing"></span> ACTIVE LOG
+            </div>
+        </div>
+        
+        <!-- Vessel Profile Card -->
+        <div class="vessel-card">
+            <div class="vessel-icon-wrapper">
+                <i class="fa-solid fa-ship"></i>
+            </div>
+            <div class="vessel-meta">
+                <span class="vessel-name">ENGLINK DATA VESSEL</span>
+                <span class="vessel-status-text">ECDIS TRANSMISSION ON</span>
+            </div>
+        </div>
+        
+        <!-- Dynamic Side Panel KPIs -->
+        <div class="section-title">
+            <i class="fa-solid fa-gauge-high"></i> CURRENT ENGINE & TELEMETRY
+        </div>
+        
+        <div class="kpi-grid">
+            <div class="kpi-card power">
+                <span class="kpi-label">SHAFT POWER</span>
+                <div class="kpi-value-row">
+                    <span class="kpi-value" id="kpi-power">0.0</span>
+                    <span class="kpi-unit">kW</span>
+                </div>
+            </div>
+            
+            <div class="kpi-card rpm">
+                <span class="kpi-label">SHAFT SPEED</span>
+                <div class="kpi-value-row">
+                    <span class="kpi-value" id="kpi-rpm">0.0</span>
+                    <span class="kpi-unit">RPM</span>
+                </div>
+            </div>
+            
+            <div class="kpi-card speed">
+                <span class="kpi-label">VESSEL SPEED</span>
+                <div class="kpi-value-row">
+                    <span class="kpi-value" id="kpi-speed">0.0</span>
+                    <span class="kpi-unit">KT</span>
+                </div>
+            </div>
+            
+            <div class="kpi-card heading">
+                <span class="kpi-label">HEADING</span>
+                <div class="kpi-value-row">
+                    <span class="kpi-value" id="kpi-heading">0.0</span>
+                    <span class="kpi-unit">°</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- GPS Status Card -->
+        <div class="section-title">
+            <i class="fa-solid fa-location-crosshairs"></i> ECDIS GEOMETRY
+        </div>
+        
+        <div class="gps-panel">
+            <div class="gps-coord-row">
+                <span class="gps-coord-label">LATITUDE:</span>
+                <span class="gps-coord-val" id="kpi-lat">--</span>
+            </div>
+            <div class="gps-coord-row">
+                <span class="gps-coord-label">LONGITUDE:</span>
+                <span class="gps-coord-val" id="kpi-lon">--</span>
+            </div>
+            <div class="gps-coord-row" style="border-top: 1px solid rgba(26,44,63,0.3); padding-top: 6px; margin-top: 4px;">
+                <span class="gps-coord-label" style="color: var(--text-secondary)">UTC TIMETAG:</span>
+                <span class="gps-coord-val" id="kpi-time" style="color: var(--text-primary)">--</span>
+            </div>
+        </div>
+        
+        <!-- Voyage Overall Summary KPIs -->
+        <div class="section-title">
+            <i class="fa-solid fa-chart-line"></i> VOYAGE TOTAL METRICS
+        </div>
+        
+        <div class="voyage-summary">
+            <div class="summary-row">
+                <span class="summary-label">Total Distance</span>
+                <span class="summary-value" id="summary-distance">7.19 NM (13.31 km)</span>
+            </div>
+            <div class="summary-row">
+                <span class="summary-label">Average Speed</span>
+                <span class="summary-value" id="summary-avg-speed">16.85 knots</span>
+            </div>
+            <div class="summary-row">
+                <span class="summary-label">Max Shaft Power</span>
+                <span class="summary-value" id="summary-max-power">12200.0 kW</span>
+            </div>
+            <div class="summary-row">
+                <span class="summary-label">Voyage Duration</span>
+                <span class="summary-value" id="summary-duration">30.0 mins</span>
+            </div>
+        </div>
+        
+        <!-- Selection Controls -->
+        <div class="section-title">
+            <i class="fa-solid fa-sliders"></i> USER CONTROLS
+        </div>
+        
+        <div class="control-group">
+            <label class="control-label" for="color-by-select">Colour Route By</label>
+            <select id="color-by-select">
+                <option value="power" selected>M/E Shaft Power</option>
+                <option value="rpm">M/E Shaft RPM</option>
+                <option value="speed">Ship Speed</option>
+                <option value="heading">Vessel Heading</option>
+            </select>
+        </div>
+        
+        <div class="control-group">
+            <label class="control-label" for="map-style-select">Map Background</label>
+            <select id="map-style-select">
+                <option value="open-street-map" selected>OpenStreetMap (Default)</option>
+                <option value="carto-darkmatter">Carto Darkmatter (Radar Style)</option>
+                <option value="carto-positron">Carto Positron (Light Outline)</option>
+            </select>
+        </div>
+
+    </div>
+
+    <!-- Main Map workspace -->
+    <div class="main-workspace">
+        
+        <!-- Map Overlay Header -->
+        <div class="map-overlay-title">
+            <h1>VESSEL VOYAGE TRAJECTORY</h1>
+            <p>HIGH-FREQUENCY HARNESS PERFORMANCE MONITORING | FLIGHT FLUID PLOT</p>
+        </div>
+        
+        <!-- Plotly Map target -->
+        <div class="map-container">
+            <div id="map-plot"></div>
+        </div>
+        
+        <!-- Bottom Timeline playback controls -->
+        <div class="playback-bar">
+            
+            <div class="slider-row">
+                <span class="time-display" id="elapsed-time-display">00:00</span>
+                <div class="scrubber-container">
+                    <input type="range" id="time-slider" min="0" max="100" value="0">
+                </div>
+                <span class="time-display" id="total-time-display">00:00</span>
+            </div>
+            
+            <div class="controls-row">
+                <div class="playback-buttons">
+                    <button class="btn btn-play" id="btn-play">
+                        <i class="fa-solid fa-play"></i> PLAY
+                    </button>
+                    <button class="btn btn-pause" id="btn-pause" style="display: none;">
+                        <i class="fa-solid fa-pause"></i> PAUSE
+                    </button>
+                    <button class="btn" id="btn-reset">
+                        <i class="fa-solid fa-rotate-left"></i> RESTART
+                    </button>
+                </div>
+                
+                <div class="speed-control">
+                    <span>Playback Speed:</span>
+                    <button class="btn" id="btn-speed-down"><i class="fa-solid fa-minus"></i></button>
+                    <span class="speed-badge" id="speed-badge">5x</span>
+                    <button class="btn" id="btn-speed-up"><i class="fa-solid fa-plus"></i></button>
+                </div>
+            </div>
+            
+        </div>
+        
+    </div>
+
+    <script>
+        // Inject high-frequency data payload from Python
+        const data = {
+            timestamps: ["2026-07-08T06:07:47Z", "2026-07-08T06:07:48Z", "2026-07-08T06:07:49Z", "2026-07-08T06:07:50Z", "2026-07-08T06:07:51Z", "2026-07-08T06:07:52Z", "2026-07-08T06:07:53Z", "2026-07-08T06:07:54Z", "2026-07-08T06:07:55Z", "2026-07-08T06:07:56Z", "2026-07-08T06:07:57Z", "2026-07-08T06:07:58Z", "2026-07-08T06:07:59Z", "2026-07-08T06:08:00Z", "2026-07-08T06:08:01Z", "2026-07-08T06:08:02Z", "2026-07-08T06:08:03Z", "2026-07-08T06:08:04Z", "2026-07-08T06:08:05Z", "2026-07-08T06:08:06Z", "2026-07-08T06:08:07Z", "2026-07-08T06:08:08Z", "2026-07-08T06:08:09Z", "2026-07-08T06:08:10Z", "2026-07-08T06:08:11Z", "2026-07-08T06:08:12Z", "2026-07-08T06:08:13Z", "2026-07-08T06:08:14Z", "2026-07-08T06:08:15Z", "2026-07-08T06:08:16Z", "2026-07-08T06:08:17Z", "2026-07-08T06:08:18Z", "2026-07-08T06:08:19Z", "2026-07-08T06:08:20Z", "2026-07-08T06:08:21Z", "2026-07-08T06:08:22Z", "2026-07-08T06:08:23Z", "2026-07-08T06:08:24Z", "2026-07-08T06:08:25Z", "2026-07-08T06:08:26Z", "2026-07-08T06:08:27Z", "2026-07-08T06:08:28Z", "2026-07-08T06:08:29Z", "2026-07-08T06:08:30Z", "2026-07-08T06:08:31Z", "2026-07-08T06:08:32Z", "2026-07-08T06:08:33Z", "2026-07-08T06:08:34Z", "2026-07-08T06:08:35Z", "2026-07-08T06:08:36Z", "2026-07-08T06:08:37Z", "2026-07-08T06:08:38Z", "2026-07-08T06:08:39Z", "2026-07-08T06:08:40Z", "2026-07-08T06:08:41Z", "2026-07-08T06:08:42Z", "2026-07-08T06:08:43Z", "2026-07-08T06:08:44Z", "2026-07-08T06:08:45Z", "2026-07-08T06:08:46Z", "2026-07-08T06:08:47Z", "2026-07-08T06:08:48Z", "2026-07-08T06:08:49Z", "2026-07-08T06:08:50Z", "2026-07-08T06:08:51Z", "2026-07-08T06:08:52Z", "2026-07-08T06:08:53Z", "2026-07-08T06:08:54Z", "2026-07-08T06:08:55Z", "2026-07-08T06:08:56Z", "2026-07-08T06:08:57Z", "2026-07-08T06:08:58Z", "2026-07-08T06:08:59Z", "2026-07-08T06:09:00Z", "2026-07-08T06:09:01Z", "2026-07-08T06:09:02Z", "2026-07-08T06:09:03Z", "2026-07-08T06:09:04Z", "2026-07-08T06:09:05Z", "2026-07-08T06:09:06Z", "2026-07-08T06:09:07Z", "2026-07-08T06:09:08Z", "2026-07-08T06:09:09Z", "2026-07-08T06:09:10Z", "2026-07-08T06:09:11Z", "2026-07-08T06:09:12Z", "2026-07-08T06:09:13Z", "2026-07-08T06:09:14Z", "2026-07-08T06:09:15Z", "2026-07-08T06:09:16Z", "2026-07-08T06:09:17Z", "2026-07-08T06:09:18Z", "2026-07-08T06:09:19Z", "2026-07-08T06:09:20Z", "2026-07-08T06:09:21Z", "2026-07-08T06:09:22Z", "2026-07-08T06:09:23Z", "2026-07-08T06:09:24Z", "2026-07-08T06:09:25Z", "2026-07-08T06:09:26Z", "2026-07-08T06:09:27Z", "2026-07-08T06:09:28Z", "2026-07-08T06:09:29Z", "2026-07-08T06:09:30Z", "2026-07-08T06:09:31Z", "2026-07-08T06:09:32Z", "2026-07-08T06:09:33Z", "2026-07-08T06:09:34Z", "2026-07-08T06:09:35Z", "2026-07-08T06:09:36Z", "2026-07-08T06:09:37Z", "2026-07-08T06:09:38Z", "2026-07-08T06:09:39Z", "2026-07-08T06:09:40Z", "2026-07-08T06:09:41Z", "2026-07-08T06:09:42Z", "2026-07-08T06:09:43Z", "2026-07-08T06:09:44Z", "2026-07-08T06:09:45Z", "2026-07-08T06:09:46Z", "2026-07-08T06:09:47Z", "2026-07-08T06:09:48Z", "2026-07-08T06:09:49Z", "2026-07-08T06:09:50Z", "2026-07-08T06:09:51Z", "2026-07-08T06:09:52Z", "2026-07-08T06:09:53Z", "2026-07-08T06:09:54Z", "2026-07-08T06:09:55Z", "2026-07-08T06:09:56Z", "2026-07-08T06:09:57Z", "2026-07-08T06:09:58Z", "2026-07-08T06:09:59Z", "2026-07-08T06:10:00Z", "2026-07-08T06:10:01Z", "2026-07-08T06:10:02Z", "2026-07-08T06:10:03Z", "2026-07-08T06:10:04Z", "2026-07-08T06:10:05Z", "2026-07-08T06:10:06Z", "2026-07-08T06:10:07Z", "2026-07-08T06:10:08Z", "2026-07-08T06:10:09Z", "2026-07-08T06:10:10Z", "2026-07-08T06:10:11Z", "2026-07-08T06:10:12Z", "2026-07-08T06:10:13Z", "2026-07-08T06:10:14Z", "2026-07-08T06:10:15Z", "2026-07-08T06:10:16Z", "2026-07-08T06:10:17Z", "2026-07-08T06:10:18Z", "2026-07-08T06:10:19Z", "2026-07-08T06:10:20Z", "2026-07-08T06:10:21Z", "2026-07-08T06:10:22Z", "2026-07-08T06:10:23Z", "2026-07-08T06:10:24Z", "2026-07-08T06:10:25Z", "2026-07-08T06:10:26Z", "2026-07-08T06:10:27Z", "2026-07-08T06:10:28Z", "2026-07-08T06:10:29Z", "2026-07-08T06:10:30Z", "2026-07-08T06:10:31Z", "2026-07-08T06:10:32Z", "2026-07-08T06:10:33Z", "2026-07-08T06:10:34Z", "2026-07-08T06:10:35Z", "2026-07-08T06:10:36Z", "2026-07-08T06:10:37Z", "2026-07-08T06:10:38Z", "2026-07-08T06:10:39Z", "2026-07-08T06:10:40Z", "2026-07-08T06:10:41Z", "2026-07-08T06:10:42Z", "2026-07-08T06:10:43Z", "2026-07-08T06:10:44Z", "2026-07-08T06:10:45Z", "2026-07-08T06:10:46Z", "2026-07-08T06:10:47Z", "2026-07-08T06:10:48Z", "2026-07-08T06:10:49Z", "2026-07-08T06:10:50Z", "2026-07-08T06:10:51Z", "2026-07-08T06:10:52Z", "2026-07-08T06:10:53Z", "2026-07-08T06:10:54Z", "2026-07-08T06:10:55Z", "2026-07-08T06:10:56Z", "2026-07-08T06:10:57Z", "2026-07-08T06:10:58Z", "2026-07-08T06:10:59Z", "2026-07-08T06:11:00Z", "2026-07-08T06:11:01Z", "2026-07-08T06:11:02Z", "2026-07-08T06:11:03Z", "2026-07-08T06:11:04Z", "2026-07-08T06:11:05Z", "2026-07-08T06:11:06Z", "2026-07-08T06:11:07Z", "2026-07-08T06:11:08Z", "2026-07-08T06:11:09Z", "2026-07-08T06:11:10Z", "2026-07-08T06:11:11Z", "2026-07-08T06:11:12Z", "2026-07-08T06:11:13Z", "2026-07-08T06:11:14Z", "2026-07-08T06:11:15Z", "2026-07-08T06:11:16Z", "2026-07-08T06:11:17Z", "2026-07-08T06:11:18Z", "2026-07-08T06:11:19Z", "2026-07-08T06:11:20Z", "2026-07-08T06:11:21Z", "2026-07-08T06:11:22Z", "2026-07-08T06:11:23Z", "2026-07-08T06:11:24Z", "2026-07-08T06:11:25Z", "2026-07-08T06:11:26Z", "2026-07-08T06:11:27Z", "2026-07-08T06:11:28Z", "2026-07-08T06:11:29Z", "2026-07-08T06:11:30Z", "2026-07-08T06:11:31Z", "2026-07-08T06:11:32Z", "2026-07-08T06:11:33Z", "2026-07-08T06:11:34Z", "2026-07-08T06:11:35Z", "2026-07-08T06:11:36Z", "2026-07-08T06:11:37Z", "2026-07-08T06:11:38Z", "2026-07-08T06:11:39Z", "2026-07-08T06:11:40Z", "2026-07-08T06:11:41Z", "2026-07-08T06:11:42Z", "2026-07-08T06:11:43Z", "2026-07-08T06:11:44Z", "2026-07-08T06:11:45Z", "2026-07-08T06:11:46Z", "2026-07-08T06:11:47Z", "2026-07-08T06:11:48Z", "2026-07-08T06:11:49Z", "2026-07-08T06:11:50Z", "2026-07-08T06:11:51Z", "2026-07-08T06:11:52Z", "2026-07-08T06:11:53Z", "2026-07-08T06:11:54Z", "2026-07-08T06:11:55Z", "2026-07-08T06:11:56Z", "2026-07-08T06:11:57Z", "2026-07-08T06:11:58Z", "2026-07-08T06:11:59Z", "2026-07-08T06:12:00Z", "2026-07-08T06:12:01Z", "2026-07-08T06:12:02Z", "2026-07-08T06:12:03Z", "2026-07-08T06:12:04Z", "2026-07-08T06:12:05Z", "2026-07-08T06:12:06Z", "2026-07-08T06:12:07Z", "2026-07-08T06:12:08Z", "2026-07-08T06:12:09Z", "2026-07-08T06:12:10Z", "2026-07-08T06:12:11Z", "2026-07-08T06:12:12Z", "2026-07-08T06:12:13Z", "2026-07-08T06:12:14Z", "2026-07-08T06:12:15Z", "2026-07-08T06:12:16Z", "2026-07-08T06:12:17Z", "2026-07-08T06:12:18Z", "2026-07-08T06:12:19Z", "2026-07-08T06:12:20Z", "2026-07-08T06:12:21Z", "2026-07-08T06:12:22Z", "2026-07-08T06:12:23Z", "2026-07-08T06:12:24Z", "2026-07-08T06:12:25Z", "2026-07-08T06:12:26Z", "2026-07-08T06:12:27Z", "2026-07-08T06:12:28Z", "2026-07-08T06:12:29Z", "2026-07-08T06:12:30Z", "2026-07-08T06:12:31Z", "2026-07-08T06:12:32Z", "2026-07-08T06:12:33Z", "2026-07-08T06:12:34Z", "2026-07-08T06:12:35Z", "2026-07-08T06:12:36Z", "2026-07-08T06:12:37Z", "2026-07-08T06:12:38Z", "2026-07-08T06:12:39Z", "2026-07-08T06:12:40Z", "2026-07-08T06:12:41Z", "2026-07-08T06:12:42Z", "2026-07-08T06:12:43Z", "2026-07-08T06:12:44Z", "2026-07-08T06:12:45Z", "2026-07-08T06:12:46Z", "2026-07-08T06:12:47Z", "2026-07-08T06:12:48Z", "2026-07-08T06:12:49Z", "2026-07-08T06:12:50Z", "2026-07-08T06:12:51Z", "2026-07-08T06:12:52Z", "2026-07-08T06:12:53Z", "2026-07-08T06:12:54Z", "2026-07-08T06:12:55Z", "2026-07-08T06:12:56Z", "2026-07-08T06:12:57Z", "2026-07-08T06:12:58Z", "2026-07-08T06:12:59Z", "2026-07-08T06:13:00Z", "2026-07-08T06:13:01Z", "2026-07-08T06:13:02Z", "2026-07-08T06:13:03Z", "2026-07-08T06:13:04Z", "2026-07-08T06:13:05Z", "2026-07-08T06:13:06Z", "2026-07-08T06:13:07Z", "2026-07-08T06:13:08Z", "2026-07-08T06:13:09Z", "2026-07-08T06:13:10Z", "2026-07-08T06:13:11Z", "2026-07-08T06:13:12Z", "2026-07-08T06:13:13Z", "2026-07-08T06:13:14Z", "2026-07-08T06:13:15Z", "2026-07-08T06:13:16Z", "2026-07-08T06:13:17Z", "2026-07-08T06:13:18Z", "2026-07-08T06:13:19Z", "2026-07-08T06:13:20Z", "2026-07-08T06:13:21Z", "2026-07-08T06:13:22Z", "2026-07-08T06:13:23Z", "2026-07-08T06:13:24Z", "2026-07-08T06:13:25Z", "2026-07-08T06:13:26Z", "2026-07-08T06:13:27Z", "2026-07-08T06:13:28Z", "2026-07-08T06:13:29Z", "2026-07-08T06:13:30Z", "2026-07-08T06:13:31Z", "2026-07-08T06:13:32Z", "2026-07-08T06:13:33Z", "2026-07-08T06:13:34Z", "2026-07-08T06:13:35Z", "2026-07-08T06:13:36Z", "2026-07-08T06:13:37Z", "2026-07-08T06:13:38Z", "2026-07-08T06:13:39Z", "2026-07-08T06:13:40Z", "2026-07-08T06:13:41Z", "2026-07-08T06:13:42Z", "2026-07-08T06:13:43Z", "2026-07-08T06:13:44Z", "2026-07-08T06:13:45Z", "2026-07-08T06:13:46Z", "2026-07-08T06:13:47Z", "2026-07-08T06:13:48Z", "2026-07-08T06:13:49Z", "2026-07-08T06:13:50Z", "2026-07-08T06:13:51Z", "2026-07-08T06:13:52Z", "2026-07-08T06:13:53Z", "2026-07-08T06:13:54Z", "2026-07-08T06:13:55Z", "2026-07-08T06:13:56Z", "2026-07-08T06:13:57Z", "2026-07-08T06:13:58Z", "2026-07-08T06:13:59Z", "2026-07-08T06:14:00Z", "2026-07-08T06:14:01Z", "2026-07-08T06:14:02Z", "2026-07-08T06:14:03Z", "2026-07-08T06:14:04Z", "2026-07-08T06:14:05Z", "2026-07-08T06:14:06Z", "2026-07-08T06:14:07Z", "2026-07-08T06:14:08Z", "2026-07-08T06:14:09Z", "2026-07-08T06:14:10Z", "2026-07-08T06:14:11Z", "2026-07-08T06:14:12Z", "2026-07-08T06:14:13Z", "2026-07-08T06:14:14Z", "2026-07-08T06:14:15Z", "2026-07-08T06:14:16Z", "2026-07-08T06:14:17Z", "2026-07-08T06:14:18Z", "2026-07-08T06:14:19Z", "2026-07-08T06:14:20Z", "2026-07-08T06:14:21Z", "2026-07-08T06:14:22Z", "2026-07-08T06:14:23Z", "2026-07-08T06:14:24Z", "2026-07-08T06:14:25Z", "2026-07-08T06:14:26Z", "2026-07-08T06:14:27Z", "2026-07-08T06:14:28Z", "2026-07-08T06:14:29Z", "2026-07-08T06:14:30Z", "2026-07-08T06:14:31Z", "2026-07-08T06:14:32Z", "2026-07-08T06:14:33Z", "2026-07-08T06:14:34Z", "2026-07-08T06:14:35Z", "2026-07-08T06:14:36Z", "2026-07-08T06:14:37Z", "2026-07-08T06:14:38Z", "2026-07-08T06:14:39Z", "2026-07-08T06:14:40Z", "2026-07-08T06:14:41Z", "2026-07-08T06:14:42Z", "2026-07-08T06:14:43Z", "2026-07-08T06:14:44Z", "2026-07-08T06:14:45Z", "2026-07-08T06:14:46Z", "2026-07-08T06:14:47Z", "2026-07-08T06:14:48Z", "2026-07-08T06:14:49Z", "2026-07-08T06:14:50Z", "2026-07-08T06:14:51Z", "2026-07-08T06:14:52Z", "2026-07-08T06:14:53Z", "2026-07-08T06:14:54Z", "2026-07-08T06:14:55Z", "2026-07-08T06:14:56Z", "2026-07-08T06:14:57Z", "2026-07-08T06:14:58Z", "2026-07-08T06:14:59Z", "2026-07-08T06:15:00Z", "2026-07-08T06:15:01Z", "2026-07-08T06:15:02Z", "2026-07-08T06:15:03Z", "2026-07-08T06:15:04Z", "2026-07-08T06:15:05Z", "2026-07-08T06:15:06Z", "2026-07-08T06:15:07Z", "2026-07-08T06:15:08Z", "2026-07-08T06:15:09Z", "2026-07-08T06:15:10Z", "2026-07-08T06:15:11Z", "2026-07-08T06:15:12Z", "2026-07-08T06:15:13Z", "2026-07-08T06:15:14Z", "2026-07-08T06:15:15Z", "2026-07-08T06:15:16Z", "2026-07-08T06:15:17Z", "2026-07-08T06:15:18Z", "2026-07-08T06:15:19Z", "2026-07-08T06:15:20Z", "2026-07-08T06:15:21Z", "2026-07-08T06:15:22Z", "2026-07-08T06:15:23Z", "2026-07-08T06:15:24Z", "2026-07-08T06:15:25Z", "2026-07-08T06:15:26Z", "2026-07-08T06:15:27Z", "2026-07-08T06:15:28Z", "2026-07-08T06:15:29Z", "2026-07-08T06:15:30Z", "2026-07-08T06:15:31Z", "2026-07-08T06:15:32Z", "2026-07-08T06:15:33Z", "2026-07-08T06:15:34Z", "2026-07-08T06:15:35Z", "2026-07-08T06:15:36Z", "2026-07-08T06:15:37Z", "2026-07-08T06:15:38Z", "2026-07-08T06:15:39Z", "2026-07-08T06:15:40Z", "2026-07-08T06:15:41Z", "2026-07-08T06:15:42Z", "2026-07-08T06:15:43Z", "2026-07-08T06:15:44Z", "2026-07-08T06:15:45Z", "2026-07-08T06:15:46Z", "2026-07-08T06:15:47Z", "2026-07-08T06:15:48Z", "2026-07-08T06:15:49Z", "2026-07-08T06:15:50Z", "2026-07-08T06:15:51Z", "2026-07-08T06:15:52Z", "2026-07-08T06:15:53Z", "2026-07-08T06:15:54Z", "2026-07-08T06:15:55Z", "2026-07-08T06:15:56Z", "2026-07-08T06:15:57Z", "2026-07-08T06:15:58Z", "2026-07-08T06:15:59Z", "2026-07-08T06:16:00Z", "2026-07-08T06:16:01Z", "2026-07-08T06:16:02Z", "2026-07-08T06:16:03Z", "2026-07-08T06:16:04Z", "2026-07-08T06:16:05Z", "2026-07-08T06:16:06Z", "2026-07-08T06:16:07Z", "2026-07-08T06:16:08Z", "2026-07-08T06:16:09Z", "2026-07-08T06:16:10Z", "2026-07-08T06:16:11Z", "2026-07-08T06:16:12Z", "2026-07-08T06:16:13Z", "2026-07-08T06:16:14Z", "2026-07-08T06:16:15Z", "2026-07-08T06:16:16Z", "2026-07-08T06:16:17Z", "2026-07-08T06:16:18Z", "2026-07-08T06:16:19Z", "2026-07-08T06:16:20Z", "2026-07-08T06:16:21Z", "2026-07-08T06:16:22Z", "2026-07-08T06:16:23Z", "2026-07-08T06:16:24Z", "2026-07-08T06:16:25Z", "2026-07-08T06:16:26Z", "2026-07-08T06:16:27Z", "2026-07-08T06:16:28Z", "2026-07-08T06:16:29Z", "2026-07-08T06:16:30Z", "2026-07-08T06:16:31Z", "2026-07-08T06:16:32Z", "2026-07-08T06:16:33Z", "2026-07-08T06:16:34Z", "2026-07-08T06:16:35Z", "2026-07-08T06:16:36Z", "2026-07-08T06:16:37Z", "2026-07-08T06:16:38Z", "2026-07-08T06:16:39Z", "2026-07-08T06:16:40Z", "2026-07-08T06:16:41Z", "2026-07-08T06:16:42Z", "2026-07-08T06:16:43Z", "2026-07-08T06:16:44Z", "2026-07-08T06:16:45Z", "2026-07-08T06:16:46Z", "2026-07-08T06:16:47Z", "2026-07-08T06:16:48Z", "2026-07-08T06:16:49Z", "2026-07-08T06:16:50Z", "2026-07-08T06:16:51Z", "2026-07-08T06:16:52Z", "2026-07-08T06:16:53Z", "2026-07-08T06:16:54Z", "2026-07-08T06:16:55Z", "2026-07-08T06:16:56Z", "2026-07-08T06:16:57Z", "2026-07-08T06:16:58Z", "2026-07-08T06:16:59Z", "2026-07-08T06:17:00Z", "2026-07-08T06:17:01Z", "2026-07-08T06:17:02Z", "2026-07-08T06:17:03Z", "2026-07-08T06:17:04Z", "2026-07-08T06:17:05Z", "2026-07-08T06:17:06Z", "2026-07-08T06:17:07Z", "2026-07-08T06:17:08Z", "2026-07-08T06:17:09Z", "2026-07-08T06:17:10Z", "2026-07-08T06:17:11Z", "2026-07-08T06:17:12Z", "2026-07-08T06:17:13Z", "2026-07-08T06:17:14Z", "2026-07-08T06:17:15Z", "2026-07-08T06:17:16Z", "2026-07-08T06:17:17Z", "2026-07-08T06:17:18Z", "2026-07-08T06:17:19Z", "2026-07-08T06:17:20Z", "2026-07-08T06:17:21Z", "2026-07-08T06:17:22Z", "2026-07-08T06:17:23Z", "2026-07-08T06:17:24Z", "2026-07-08T06:17:25Z", "2026-07-08T06:17:26Z", "2026-07-08T06:17:27Z", "2026-07-08T06:17:28Z", "2026-07-08T06:17:29Z", "2026-07-08T06:17:30Z", "2026-07-08T06:17:31Z", "2026-07-08T06:17:32Z", "2026-07-08T06:17:33Z", "2026-07-08T06:17:34Z", "2026-07-08T06:17:35Z", "2026-07-08T06:17:36Z", "2026-07-08T06:17:37Z", "2026-07-08T06:17:38Z", "2026-07-08T06:17:39Z", "2026-07-08T06:17:40Z", "2026-07-08T06:17:41Z", "2026-07-08T06:17:42Z", "2026-07-08T06:17:43Z", "2026-07-08T06:17:44Z", "2026-07-08T06:17:45Z", "2026-07-08T06:17:46Z", "2026-07-08T06:17:47Z", "2026-07-08T06:17:48Z", "2026-07-08T06:17:49Z", "2026-07-08T06:17:50Z", "2026-07-08T06:17:51Z", "2026-07-08T06:17:52Z", "2026-07-08T06:17:53Z", "2026-07-08T06:17:54Z", "2026-07-08T06:17:55Z", "2026-07-08T06:17:56Z", "2026-07-08T06:17:57Z", "2026-07-08T06:17:58Z", "2026-07-08T06:17:59Z", "2026-07-08T06:18:00Z", "2026-07-08T06:18:01Z", "2026-07-08T06:18:02Z", "2026-07-08T06:18:03Z", "2026-07-08T06:18:04Z", "2026-07-08T06:18:05Z", "2026-07-08T06:18:06Z", "2026-07-08T06:18:07Z", "2026-07-08T06:18:08Z", "2026-07-08T06:18:09Z", "2026-07-08T06:18:10Z", "2026-07-08T06:18:11Z", "2026-07-08T06:18:12Z", "2026-07-08T06:18:13Z", "2026-07-08T06:18:14Z", "2026-07-08T06:18:15Z", "2026-07-08T06:18:16Z", "2026-07-08T06:18:17Z", "2026-07-08T06:18:18Z", "2026-07-08T06:18:19Z", "2026-07-08T06:18:20Z", "2026-07-08T06:18:21Z", "2026-07-08T06:18:22Z", "2026-07-08T06:18:23Z", "2026-07-08T06:18:24Z", "2026-07-08T06:18:25Z", "2026-07-08T06:18:26Z", "2026-07-08T06:18:27Z", "2026-07-08T06:18:28Z", "2026-07-08T06:18:29Z", "2026-07-08T06:18:30Z", "2026-07-08T06:18:31Z", "2026-07-08T06:18:32Z", "2026-07-08T06:18:33Z", "2026-07-08T06:18:34Z", "2026-07-08T06:18:35Z", "2026-07-08T06:18:36Z", "2026-07-08T06:18:37Z", "2026-07-08T06:18:38Z", "2026-07-08T06:18:39Z", "2026-07-08T06:18:40Z", "2026-07-08T06:18:41Z", "2026-07-08T06:18:42Z", "2026-07-08T06:18:43Z", "2026-07-08T06:18:44Z", "2026-07-08T06:18:45Z", "2026-07-08T06:18:46Z", "2026-07-08T06:18:47Z", "2026-07-08T06:18:48Z", "2026-07-08T06:18:49Z", "2026-07-08T06:18:50Z", "2026-07-08T06:18:51Z", "2026-07-08T06:18:52Z", "2026-07-08T06:18:53Z", "2026-07-08T06:18:54Z", "2026-07-08T06:18:55Z", "2026-07-08T06:18:56Z", "2026-07-08T06:18:57Z", "2026-07-08T06:18:58Z", "2026-07-08T06:18:59Z", "2026-07-08T06:19:00Z", "2026-07-08T06:19:01Z", "2026-07-08T06:19:02Z", "2026-07-08T06:19:03Z", "2026-07-08T06:19:04Z", "2026-07-08T06:19:05Z", "2026-07-08T06:19:06Z", "2026-07-08T06:19:07Z", "2026-07-08T06:19:08Z", "2026-07-08T06:19:09Z", "2026-07-08T06:19:10Z", "2026-07-08T06:19:11Z", "2026-07-08T06:19:12Z", "2026-07-08T06:19:13Z", "2026-07-08T06:19:14Z", "2026-07-08T06:19:15Z", "2026-07-08T06:19:16Z", "2026-07-08T06:19:17Z", "2026-07-08T06:19:18Z", "2026-07-08T06:19:19Z", "2026-07-08T06:19:20Z", "2026-07-08T06:19:21Z", "2026-07-08T06:19:22Z", "2026-07-08T06:19:23Z", "2026-07-08T06:19:24Z", "2026-07-08T06:19:25Z", "2026-07-08T06:19:26Z", "2026-07-08T06:19:27Z", "2026-07-08T06:19:28Z", "2026-07-08T06:19:29Z", "2026-07-08T06:19:30Z", "2026-07-08T06:19:31Z", "2026-07-08T06:19:32Z", "2026-07-08T06:19:33Z", "2026-07-08T06:19:34Z", "2026-07-08T06:19:35Z", "2026-07-08T06:19:36Z", "2026-07-08T06:19:37Z", "2026-07-08T06:19:38Z", "2026-07-08T06:19:39Z", "2026-07-08T06:19:40Z", "2026-07-08T06:19:41Z", "2026-07-08T06:19:42Z", "2026-07-08T06:19:43Z", "2026-07-08T06:19:44Z", "2026-07-08T06:19:45Z", "2026-07-08T06:19:46Z", "2026-07-08T06:19:47Z", "2026-07-08T06:19:48Z", "2026-07-08T06:19:49Z", "2026-07-08T06:19:50Z", "2026-07-08T06:19:51Z", "2026-07-08T06:19:52Z", "2026-07-08T06:19:53Z", "2026-07-08T06:19:54Z", "2026-07-08T06:19:55Z", "2026-07-08T06:19:56Z", "2026-07-08T06:19:57Z", "2026-07-08T06:19:58Z", "2026-07-08T06:19:59Z", "2026-07-08T06:20:00Z", "2026-07-08T06:20:01Z", "2026-07-08T06:20:02Z", "2026-07-08T06:20:03Z", "2026-07-08T06:20:04Z", "2026-07-08T06:20:05Z", "2026-07-08T06:20:06Z", "2026-07-08T06:20:07Z", "2026-07-08T06:20:08Z", "2026-07-08T06:20:09Z", "2026-07-08T06:20:10Z", "2026-07-08T06:20:11Z", "2026-07-08T06:20:12Z", "2026-07-08T06:20:13Z", "2026-07-08T06:20:14Z", "2026-07-08T06:20:15Z", "2026-07-08T06:20:16Z", "2026-07-08T06:20:17Z", "2026-07-08T06:20:18Z", "2026-07-08T06:20:19Z", "2026-07-08T06:20:20Z", "2026-07-08T06:20:21Z", "2026-07-08T06:20:22Z", "2026-07-08T06:20:23Z", "2026-07-08T06:20:24Z", "2026-07-08T06:20:25Z", "2026-07-08T06:20:26Z", "2026-07-08T06:20:27Z", "2026-07-08T06:20:28Z", "2026-07-08T06:20:29Z", "2026-07-08T06:20:30Z", "2026-07-08T06:20:31Z", "2026-07-08T06:20:32Z", "2026-07-08T06:20:33Z", "2026-07-08T06:20:34Z", "2026-07-08T06:20:35Z", "2026-07-08T06:20:36Z", "2026-07-08T06:20:37Z", "2026-07-08T06:20:38Z", "2026-07-08T06:20:39Z", "2026-07-08T06:20:40Z", "2026-07-08T06:20:41Z", "2026-07-08T06:20:42Z", "2026-07-08T06:20:43Z", "2026-07-08T06:20:44Z", "2026-07-08T06:20:45Z", "2026-07-08T06:20:46Z", "2026-07-08T06:20:47Z", "2026-07-08T06:20:48Z", "2026-07-08T06:20:49Z", "2026-07-08T06:20:50Z", "2026-07-08T06:20:51Z", "2026-07-08T06:20:52Z", "2026-07-08T06:20:53Z", "2026-07-08T06:20:54Z", "2026-07-08T06:20:55Z", "2026-07-08T06:20:56Z", "2026-07-08T06:20:57Z", "2026-07-08T06:20:58Z", "2026-07-08T06:20:59Z", "2026-07-08T06:21:00Z", "2026-07-08T06:21:01Z", "2026-07-08T06:21:02Z", "2026-07-08T06:21:03Z", "2026-07-08T06:21:04Z", "2026-07-08T06:21:05Z", "2026-07-08T06:21:06Z", "2026-07-08T06:21:07Z", "2026-07-08T06:21:08Z", "2026-07-08T06:21:09Z", "2026-07-08T06:21:10Z", "2026-07-08T06:21:11Z", "2026-07-08T06:21:12Z", "2026-07-08T06:21:13Z", "2026-07-08T06:21:14Z", "2026-07-08T06:21:15Z", "2026-07-08T06:21:16Z", "2026-07-08T06:21:17Z", "2026-07-08T06:21:18Z", "2026-07-08T06:21:19Z", "2026-07-08T06:21:20Z", "2026-07-08T06:21:21Z", "2026-07-08T06:21:22Z", "2026-07-08T06:21:23Z", "2026-07-08T06:21:24Z", "2026-07-08T06:21:25Z", "2026-07-08T06:21:26Z", "2026-07-08T06:21:27Z", "2026-07-08T06:21:28Z", "2026-07-08T06:21:29Z", "2026-07-08T06:21:30Z", "2026-07-08T06:21:31Z", "2026-07-08T06:21:32Z", "2026-07-08T06:21:33Z", "2026-07-08T06:21:34Z", "2026-07-08T06:21:35Z", "2026-07-08T06:21:36Z", "2026-07-08T06:21:37Z", "2026-07-08T06:21:38Z", "2026-07-08T06:21:39Z", "2026-07-08T06:21:40Z", "2026-07-08T06:21:41Z", "2026-07-08T06:21:42Z", "2026-07-08T06:21:43Z", "2026-07-08T06:21:44Z", "2026-07-08T06:21:45Z", "2026-07-08T06:21:46Z", "2026-07-08T06:21:47Z", "2026-07-08T06:21:48Z", "2026-07-08T06:21:49Z", "2026-07-08T06:21:50Z", "2026-07-08T06:21:51Z", "2026-07-08T06:21:52Z", "2026-07-08T06:21:53Z", "2026-07-08T06:21:54Z", "2026-07-08T06:21:55Z", "2026-07-08T06:21:56Z", "2026-07-08T06:21:57Z", "2026-07-08T06:21:58Z", "2026-07-08T06:21:59Z", "2026-07-08T06:22:00Z", "2026-07-08T06:22:01Z", "2026-07-08T06:22:02Z", "2026-07-08T06:22:03Z", "2026-07-08T06:22:04Z", "2026-07-08T06:22:05Z", "2026-07-08T06:22:06Z", "2026-07-08T06:22:07Z", "2026-07-08T06:22:08Z", "2026-07-08T06:22:09Z", "2026-07-08T06:22:10Z", "2026-07-08T06:22:11Z", "2026-07-08T06:22:12Z", "2026-07-08T06:22:13Z", "2026-07-08T06:22:14Z", "2026-07-08T06:22:15Z", "2026-07-08T06:22:16Z", "2026-07-08T06:22:17Z", "2026-07-08T06:22:18Z", "2026-07-08T06:22:19Z", "2026-07-08T06:22:20Z", "2026-07-08T06:22:21Z", "2026-07-08T06:22:22Z", "2026-07-08T06:22:23Z", "2026-07-08T06:22:24Z", "2026-07-08T06:22:25Z", "2026-07-08T06:22:26Z", "2026-07-08T06:22:27Z", "2026-07-08T06:22:28Z", "2026-07-08T06:22:29Z", "2026-07-08T06:22:30Z", "2026-07-08T06:22:31Z", "2026-07-08T06:22:32Z", "2026-07-08T06:22:33Z", "2026-07-08T06:22:34Z", "2026-07-08T06:22:35Z", "2026-07-08T06:22:36Z", "2026-07-08T06:22:37Z", "2026-07-08T06:22:38Z", "2026-07-08T06:22:39Z", "2026-07-08T06:22:40Z", "2026-07-08T06:22:41Z", "2026-07-08T06:22:42Z", "2026-07-08T06:22:43Z", "2026-07-08T06:22:44Z", "2026-07-08T06:22:45Z", "2026-07-08T06:22:46Z", "2026-07-08T06:22:47Z", "2026-07-08T06:22:48Z", "2026-07-08T06:22:49Z", "2026-07-08T06:22:50Z", "2026-07-08T06:22:51Z", "2026-07-08T06:22:52Z", "2026-07-08T06:22:53Z", "2026-07-08T06:22:54Z", "2026-07-08T06:22:55Z", "2026-07-08T06:22:56Z", "2026-07-08T06:22:57Z", "2026-07-08T06:22:58Z", "2026-07-08T06:22:59Z", "2026-07-08T06:23:00Z", "2026-07-08T06:23:01Z", "2026-07-08T06:23:02Z", "2026-07-08T06:23:03Z", "2026-07-08T06:23:04Z", "2026-07-08T06:23:05Z", "2026-07-08T06:23:06Z", "2026-07-08T06:23:07Z", "2026-07-08T06:23:08Z", "2026-07-08T06:23:09Z", "2026-07-08T06:23:10Z", "2026-07-08T06:23:11Z", "2026-07-08T06:23:12Z", "2026-07-08T06:23:13Z", "2026-07-08T06:23:14Z", "2026-07-08T06:23:15Z", "2026-07-08T06:23:16Z", "2026-07-08T06:23:17Z", "2026-07-08T06:23:18Z", "2026-07-08T06:23:19Z", "2026-07-08T06:23:20Z", "2026-07-08T06:23:21Z", "2026-07-08T06:23:22Z", "2026-07-08T06:23:23Z", "2026-07-08T06:23:24Z", "2026-07-08T06:23:25Z", "2026-07-08T06:23:26Z", "2026-07-08T06:23:27Z", "2026-07-08T06:23:28Z", "2026-07-08T06:23:29Z", "2026-07-08T06:23:30Z", "2026-07-08T06:23:31Z", "2026-07-08T06:23:32Z", "2026-07-08T06:23:33Z", "2026-07-08T06:23:34Z", "2026-07-08T06:23:35Z", "2026-07-08T06:23:36Z", "2026-07-08T06:23:37Z", "2026-07-08T06:23:38Z", "2026-07-08T06:23:39Z", "2026-07-08T06:23:40Z", "2026-07-08T06:23:41Z", "2026-07-08T06:23:42Z", "2026-07-08T06:23:43Z", "2026-07-08T06:23:44Z", "2026-07-08T06:23:45Z", "2026-07-08T06:23:46Z", "2026-07-08T06:23:47Z", "2026-07-08T06:23:48Z", "2026-07-08T06:23:49Z", "2026-07-08T06:23:50Z", "2026-07-08T06:23:51Z", "2026-07-08T06:23:52Z", "2026-07-08T06:23:53Z", "2026-07-08T06:23:54Z", "2026-07-08T06:23:55Z", "2026-07-08T06:23:56Z", "2026-07-08T06:23:57Z", "2026-07-08T06:23:58Z", "2026-07-08T06:23:59Z", "2026-07-08T06:24:00Z", "2026-07-08T06:24:01Z", "2026-07-08T06:24:02Z", "2026-07-08T06:24:03Z", "2026-07-08T06:24:04Z", "2026-07-08T06:24:05Z", "2026-07-08T06:24:06Z", "2026-07-08T06:24:07Z", "2026-07-08T06:24:08Z", "2026-07-08T06:24:09Z", "2026-07-08T06:24:10Z", "2026-07-08T06:24:11Z", "2026-07-08T06:24:12Z", "2026-07-08T06:24:13Z", "2026-07-08T06:24:14Z", "2026-07-08T06:24:15Z", "2026-07-08T06:24:16Z", "2026-07-08T06:24:17Z", "2026-07-08T06:24:18Z", "2026-07-08T06:24:19Z", "2026-07-08T06:24:20Z", "2026-07-08T06:24:21Z", "2026-07-08T06:24:22Z", "2026-07-08T06:24:23Z", "2026-07-08T06:24:24Z", "2026-07-08T06:24:25Z", "2026-07-08T06:24:26Z", "2026-07-08T06:24:27Z", "2026-07-08T06:24:28Z", "2026-07-08T06:24:29Z", "2026-07-08T06:24:30Z", "2026-07-08T06:24:31Z", "2026-07-08T06:24:32Z", "2026-07-08T06:24:33Z", "2026-07-08T06:24:34Z", "2026-07-08T06:24:35Z", "2026-07-08T06:24:36Z", "2026-07-08T06:24:37Z", "2026-07-08T06:24:38Z", "2026-07-08T06:24:39Z", "2026-07-08T06:24:40Z", "2026-07-08T06:24:41Z", "2026-07-08T06:24:42Z", "2026-07-08T06:24:43Z", "2026-07-08T06:24:44Z", "2026-07-08T06:24:45Z", "2026-07-08T06:24:46Z", "2026-07-08T06:24:47Z", "2026-07-08T06:24:48Z", "2026-07-08T06:24:49Z", "2026-07-08T06:24:50Z", "2026-07-08T06:24:51Z", "2026-07-08T06:24:52Z", "2026-07-08T06:24:53Z", "2026-07-08T06:24:54Z", "2026-07-08T06:24:55Z", "2026-07-08T06:24:56Z", "2026-07-08T06:24:57Z", "2026-07-08T06:24:58Z", "2026-07-08T06:24:59Z", "2026-07-08T06:25:00Z", "2026-07-08T06:25:01Z", "2026-07-08T06:25:02Z", "2026-07-08T06:25:03Z", "2026-07-08T06:25:04Z", "2026-07-08T06:25:05Z", "2026-07-08T06:25:06Z", "2026-07-08T06:25:07Z", "2026-07-08T06:25:08Z", "2026-07-08T06:25:09Z", "2026-07-08T06:25:10Z", "2026-07-08T06:25:11Z", "2026-07-08T06:25:12Z", "2026-07-08T06:25:13Z", "2026-07-08T06:25:14Z", "2026-07-08T06:25:15Z", "2026-07-08T06:25:16Z", "2026-07-08T06:25:17Z", "2026-07-08T06:25:18Z", "2026-07-08T06:25:19Z", "2026-07-08T06:25:20Z", "2026-07-08T06:25:21Z", "2026-07-08T06:25:22Z", "2026-07-08T06:25:23Z", "2026-07-08T06:25:24Z", "2026-07-08T06:25:25Z", "2026-07-08T06:25:26Z", "2026-07-08T06:25:27Z", "2026-07-08T06:25:28Z", "2026-07-08T06:25:29Z", "2026-07-08T06:25:30Z", "2026-07-08T06:25:31Z", "2026-07-08T06:25:32Z", "2026-07-08T06:25:33Z", "2026-07-08T06:25:34Z", "2026-07-08T06:25:35Z", "2026-07-08T06:25:36Z", "2026-07-08T06:25:37Z", "2026-07-08T06:25:38Z", "2026-07-08T06:25:39Z", "2026-07-08T06:25:40Z", "2026-07-08T06:25:41Z", "2026-07-08T06:25:42Z", "2026-07-08T06:25:43Z", "2026-07-08T06:25:44Z", "2026-07-08T06:25:45Z", "2026-07-08T06:25:46Z", "2026-07-08T06:25:47Z", "2026-07-08T06:25:48Z", "2026-07-08T06:25:49Z", "2026-07-08T06:25:50Z", "2026-07-08T06:25:51Z", "2026-07-08T06:25:52Z", "2026-07-08T06:25:53Z", "2026-07-08T06:25:54Z", "2026-07-08T06:25:55Z", "2026-07-08T06:25:56Z", "2026-07-08T06:25:57Z", "2026-07-08T06:25:58Z", "2026-07-08T06:25:59Z", "2026-07-08T06:26:00Z", "2026-07-08T06:26:01Z", "2026-07-08T06:26:02Z", "2026-07-08T06:26:03Z", "2026-07-08T06:26:04Z", "2026-07-08T06:26:05Z", "2026-07-08T06:26:06Z", "2026-07-08T06:26:07Z", "2026-07-08T06:26:08Z", "2026-07-08T06:26:09Z", "2026-07-08T06:26:10Z", "2026-07-08T06:26:11Z", "2026-07-08T06:26:12Z", "2026-07-08T06:26:13Z", "2026-07-08T06:26:14Z", "2026-07-08T06:26:15Z", "2026-07-08T06:26:16Z", "2026-07-08T06:26:17Z", "2026-07-08T06:26:18Z", "2026-07-08T06:26:19Z", "2026-07-08T06:26:20Z", "2026-07-08T06:26:21Z", "2026-07-08T06:26:22Z", "2026-07-08T06:26:23Z", "2026-07-08T06:26:24Z", "2026-07-08T06:26:25Z", "2026-07-08T06:26:26Z", "2026-07-08T06:26:27Z", "2026-07-08T06:26:28Z", "2026-07-08T06:26:29Z", "2026-07-08T06:26:30Z", "2026-07-08T06:26:31Z", "2026-07-08T06:26:32Z", "2026-07-08T06:26:33Z", "2026-07-08T06:26:34Z", "2026-07-08T06:26:35Z", "2026-07-08T06:26:36Z", "2026-07-08T06:26:37Z", "2026-07-08T06:26:38Z", "2026-07-08T06:26:39Z", "2026-07-08T06:26:40Z", "2026-07-08T06:26:41Z", "2026-07-08T06:26:42Z", "2026-07-08T06:26:43Z", "2026-07-08T06:26:44Z", "2026-07-08T06:26:45Z", "2026-07-08T06:26:46Z", "2026-07-08T06:26:47Z", "2026-07-08T06:26:48Z", "2026-07-08T06:26:49Z", "2026-07-08T06:26:50Z", "2026-07-08T06:26:51Z", "2026-07-08T06:26:52Z", "2026-07-08T06:26:53Z", "2026-07-08T06:26:54Z", "2026-07-08T06:26:55Z", "2026-07-08T06:26:56Z", "2026-07-08T06:26:57Z", "2026-07-08T06:26:58Z", "2026-07-08T06:26:59Z", "2026-07-08T06:27:00Z", "2026-07-08T06:27:01Z", "2026-07-08T06:27:02Z", "2026-07-08T06:27:03Z", "2026-07-08T06:27:04Z", "2026-07-08T06:27:05Z", "2026-07-08T06:27:06Z", "2026-07-08T06:27:07Z", "2026-07-08T06:27:08Z", "2026-07-08T06:27:09Z", "2026-07-08T06:27:10Z", "2026-07-08T06:27:11Z", "2026-07-08T06:27:12Z", "2026-07-08T06:27:13Z", "2026-07-08T06:27:14Z", "2026-07-08T06:27:15Z", "2026-07-08T06:27:16Z", "2026-07-08T06:27:17Z", "2026-07-08T06:27:18Z", "2026-07-08T06:27:19Z", "2026-07-08T06:27:20Z", "2026-07-08T06:27:21Z", "2026-07-08T06:27:22Z", "2026-07-08T06:27:23Z", "2026-07-08T06:27:24Z", "2026-07-08T06:27:25Z", "2026-07-08T06:27:26Z", "2026-07-08T06:27:27Z", "2026-07-08T06:27:28Z", "2026-07-08T06:27:29Z", "2026-07-08T06:27:30Z", "2026-07-08T06:27:31Z", "2026-07-08T06:27:32Z", "2026-07-08T06:27:33Z", "2026-07-08T06:27:34Z", "2026-07-08T06:27:35Z", "2026-07-08T06:27:36Z", "2026-07-08T06:27:37Z", "2026-07-08T06:27:38Z", "2026-07-08T06:27:39Z", "2026-07-08T06:27:40Z", "2026-07-08T06:27:41Z", "2026-07-08T06:27:42Z", "2026-07-08T06:27:43Z", "2026-07-08T06:27:44Z", "2026-07-08T06:27:45Z", "2026-07-08T06:27:46Z", "2026-07-08T06:27:47Z", "2026-07-08T06:27:48Z", "2026-07-08T06:27:49Z", "2026-07-08T06:27:50Z", "2026-07-08T06:27:51Z", "2026-07-08T06:27:52Z", "2026-07-08T06:27:53Z", "2026-07-08T06:27:54Z", "2026-07-08T06:27:55Z", "2026-07-08T06:27:56Z", "2026-07-08T06:27:57Z", "2026-07-08T06:27:58Z", "2026-07-08T06:27:59Z", "2026-07-08T06:28:00Z", "2026-07-08T06:28:01Z", "2026-07-08T06:28:02Z", "2026-07-08T06:28:03Z", "2026-07-08T06:28:04Z", "2026-07-08T06:28:05Z", "2026-07-08T06:28:06Z", "2026-07-08T06:28:07Z", "2026-07-08T06:28:08Z", "2026-07-08T06:28:09Z", "2026-07-08T06:28:10Z", "2026-07-08T06:28:11Z", "2026-07-08T06:28:12Z", "2026-07-08T06:28:13Z", "2026-07-08T06:28:14Z", "2026-07-08T06:28:15Z", "2026-07-08T06:28:16Z", "2026-07-08T06:28:17Z", "2026-07-08T06:28:18Z", "2026-07-08T06:28:19Z", "2026-07-08T06:28:20Z", "2026-07-08T06:28:21Z", "2026-07-08T06:28:22Z", "2026-07-08T06:28:23Z", "2026-07-08T06:28:24Z", "2026-07-08T06:28:25Z", "2026-07-08T06:28:26Z", "2026-07-08T06:28:27Z", "2026-07-08T06:28:28Z", "2026-07-08T06:28:29Z", "2026-07-08T06:28:30Z", "2026-07-08T06:28:31Z", "2026-07-08T06:28:32Z", "2026-07-08T06:28:33Z", "2026-07-08T06:28:34Z", "2026-07-08T06:28:35Z", "2026-07-08T06:28:36Z", "2026-07-08T06:28:37Z", "2026-07-08T06:28:38Z", "2026-07-08T06:28:39Z", "2026-07-08T06:28:40Z", "2026-07-08T06:28:41Z", "2026-07-08T06:28:42Z", "2026-07-08T06:28:43Z", "2026-07-08T06:28:44Z", "2026-07-08T06:28:45Z", "2026-07-08T06:28:46Z", "2026-07-08T06:28:47Z", "2026-07-08T06:28:48Z", "2026-07-08T06:28:49Z", "2026-07-08T06:28:50Z", "2026-07-08T06:28:51Z", "2026-07-08T06:28:52Z", "2026-07-08T06:28:53Z", "2026-07-08T06:28:54Z", "2026-07-08T06:28:55Z", "2026-07-08T06:28:56Z", "2026-07-08T06:28:57Z", "2026-07-08T06:28:58Z", "2026-07-08T06:28:59Z", "2026-07-08T06:29:00Z", "2026-07-08T06:29:01Z", "2026-07-08T06:29:02Z", "2026-07-08T06:29:03Z", "2026-07-08T06:29:04Z", "2026-07-08T06:29:05Z", "2026-07-08T06:29:06Z", "2026-07-08T06:29:07Z", "2026-07-08T06:29:08Z", "2026-07-08T06:29:09Z", "2026-07-08T06:29:10Z", "2026-07-08T06:29:11Z", "2026-07-08T06:29:12Z", "2026-07-08T06:29:13Z", "2026-07-08T06:29:14Z", "2026-07-08T06:29:15Z", "2026-07-08T06:29:16Z", "2026-07-08T06:29:17Z", "2026-07-08T06:29:18Z", "2026-07-08T06:29:19Z", "2026-07-08T06:29:20Z", "2026-07-08T06:29:21Z", "2026-07-08T06:29:22Z", "2026-07-08T06:29:23Z", "2026-07-08T06:29:24Z", "2026-07-08T06:29:25Z", "2026-07-08T06:29:26Z", "2026-07-08T06:29:27Z", "2026-07-08T06:29:28Z", "2026-07-08T06:29:29Z", "2026-07-08T06:29:30Z", "2026-07-08T06:29:31Z", "2026-07-08T06:29:32Z", "2026-07-08T06:29:33Z", "2026-07-08T06:29:34Z", "2026-07-08T06:29:35Z", "2026-07-08T06:29:36Z", "2026-07-08T06:29:37Z", "2026-07-08T06:29:38Z", "2026-07-08T06:29:39Z", "2026-07-08T06:29:40Z", "2026-07-08T06:29:41Z", "2026-07-08T06:29:42Z", "2026-07-08T06:29:43Z", "2026-07-08T06:29:44Z", "2026-07-08T06:29:45Z", "2026-07-08T06:29:46Z", "2026-07-08T06:29:47Z", "2026-07-08T06:29:48Z", "2026-07-08T06:29:49Z", "2026-07-08T06:29:50Z", "2026-07-08T06:29:51Z", "2026-07-08T06:29:52Z", "2026-07-08T06:29:53Z", "2026-07-08T06:29:54Z", "2026-07-08T06:29:55Z", "2026-07-08T06:29:56Z", "2026-07-08T06:29:57Z", "2026-07-08T06:29:58Z", "2026-07-08T06:29:59Z", "2026-07-08T06:30:00Z", "2026-07-08T06:30:01Z", "2026-07-08T06:30:02Z", "2026-07-08T06:30:03Z", "2026-07-08T06:30:04Z", "2026-07-08T06:30:05Z", "2026-07-08T06:30:06Z", "2026-07-08T06:30:07Z", "2026-07-08T06:30:08Z", "2026-07-08T06:30:09Z", "2026-07-08T06:30:10Z", "2026-07-08T06:30:11Z", "2026-07-08T06:30:12Z", "2026-07-08T06:30:13Z", "2026-07-08T06:30:14Z", "2026-07-08T06:30:15Z", "2026-07-08T06:30:16Z", "2026-07-08T06:30:17Z", "2026-07-08T06:30:18Z", "2026-07-08T06:30:19Z", "2026-07-08T06:30:20Z", "2026-07-08T06:30:21Z", "2026-07-08T06:30:22Z", "2026-07-08T06:30:23Z", "2026-07-08T06:30:24Z", "2026-07-08T06:30:25Z", "2026-07-08T06:30:26Z", "2026-07-08T06:30:27Z", "2026-07-08T06:30:28Z", "2026-07-08T06:30:29Z", "2026-07-08T06:30:30Z", "2026-07-08T06:30:31Z", "2026-07-08T06:30:32Z", "2026-07-08T06:30:33Z", "2026-07-08T06:30:34Z", "2026-07-08T06:30:35Z", "2026-07-08T06:30:36Z", "2026-07-08T06:30:37Z", "2026-07-08T06:30:38Z", "2026-07-08T06:30:39Z", "2026-07-08T06:30:40Z", "2026-07-08T06:30:41Z", "2026-07-08T06:30:42Z", "2026-07-08T06:30:43Z", "2026-07-08T06:30:44Z", "2026-07-08T06:30:45Z", "2026-07-08T06:30:46Z", "2026-07-08T06:30:47Z", "2026-07-08T06:30:48Z", "2026-07-08T06:30:49Z", "2026-07-08T06:30:50Z", "2026-07-08T06:30:51Z", "2026-07-08T06:30:52Z", "2026-07-08T06:30:53Z", "2026-07-08T06:30:54Z", "2026-07-08T06:30:55Z", "2026-07-08T06:30:56Z", "2026-07-08T06:30:57Z", "2026-07-08T06:30:58Z", "2026-07-08T06:30:59Z", "2026-07-08T06:31:00Z", "2026-07-08T06:31:01Z", "2026-07-08T06:31:02Z", "2026-07-08T06:31:03Z", "2026-07-08T06:31:04Z", "2026-07-08T06:31:05Z", "2026-07-08T06:31:06Z", "2026-07-08T06:31:07Z", "2026-07-08T06:31:08Z", "2026-07-08T06:31:09Z", "2026-07-08T06:31:10Z", "2026-07-08T06:31:11Z", "2026-07-08T06:31:12Z", "2026-07-08T06:31:13Z", "2026-07-08T06:31:14Z", "2026-07-08T06:31:15Z", "2026-07-08T06:31:16Z", "2026-07-08T06:31:17Z", "2026-07-08T06:31:18Z", "2026-07-08T06:31:19Z", "2026-07-08T06:31:20Z", "2026-07-08T06:31:21Z", "2026-07-08T06:31:22Z", "2026-07-08T06:31:23Z", "2026-07-08T06:31:24Z", "2026-07-08T06:31:25Z", "2026-07-08T06:31:26Z", "2026-07-08T06:31:27Z", "2026-07-08T06:31:28Z", "2026-07-08T06:31:29Z", "2026-07-08T06:31:30Z", "2026-07-08T06:31:31Z", "2026-07-08T06:31:32Z", "2026-07-08T06:31:33Z", "2026-07-08T06:31:34Z", "2026-07-08T06:31:35Z", "2026-07-08T06:31:36Z", "2026-07-08T06:31:37Z", "2026-07-08T06:31:38Z", "2026-07-08T06:31:39Z", "2026-07-08T06:31:40Z", "2026-07-08T06:31:41Z", "2026-07-08T06:31:42Z", "2026-07-08T06:31:43Z", "2026-07-08T06:31:44Z", "2026-07-08T06:31:45Z", "2026-07-08T06:31:46Z", "2026-07-08T06:31:47Z", "2026-07-08T06:31:48Z", "2026-07-08T06:31:49Z", "2026-07-08T06:31:50Z", "2026-07-08T06:31:51Z", "2026-07-08T06:31:52Z", "2026-07-08T06:31:53Z", "2026-07-08T06:31:54Z", "2026-07-08T06:31:55Z", "2026-07-08T06:31:56Z", "2026-07-08T06:31:57Z", "2026-07-08T06:31:58Z", "2026-07-08T06:31:59Z", "2026-07-08T06:32:00Z", "2026-07-08T06:32:01Z", "2026-07-08T06:32:02Z", "2026-07-08T06:32:03Z", "2026-07-08T06:32:04Z", "2026-07-08T06:32:05Z", "2026-07-08T06:32:06Z", "2026-07-08T06:32:07Z", "2026-07-08T06:32:08Z", "2026-07-08T06:32:09Z", "2026-07-08T06:32:10Z", "2026-07-08T06:32:11Z", "2026-07-08T06:32:12Z", "2026-07-08T06:32:13Z", "2026-07-08T06:32:14Z", "2026-07-08T06:32:15Z", "2026-07-08T06:32:16Z", "2026-07-08T06:32:17Z", "2026-07-08T06:32:18Z", "2026-07-08T06:32:19Z", "2026-07-08T06:32:20Z", "2026-07-08T06:32:21Z", "2026-07-08T06:32:22Z", "2026-07-08T06:32:23Z", "2026-07-08T06:32:24Z", "2026-07-08T06:32:25Z", "2026-07-08T06:32:26Z", "2026-07-08T06:32:27Z", "2026-07-08T06:32:28Z", "2026-07-08T06:32:29Z", "2026-07-08T06:32:30Z", "2026-07-08T06:32:31Z", "2026-07-08T06:32:32Z", "2026-07-08T06:32:33Z", "2026-07-08T06:32:34Z", "2026-07-08T06:32:35Z", "2026-07-08T06:32:36Z", "2026-07-08T06:32:37Z", "2026-07-08T06:32:38Z", "2026-07-08T06:32:39Z", "2026-07-08T06:32:40Z", "2026-07-08T06:32:41Z", "2026-07-08T06:32:42Z", "2026-07-08T06:32:43Z", "2026-07-08T06:32:44Z", "2026-07-08T06:32:45Z", "2026-07-08T06:32:46Z", "2026-07-08T06:32:47Z", "2026-07-08T06:32:48Z", "2026-07-08T06:32:49Z", "2026-07-08T06:32:50Z", "2026-07-08T06:32:51Z", "2026-07-08T06:32:52Z", "2026-07-08T06:32:53Z", "2026-07-08T06:32:54Z", "2026-07-08T06:32:55Z", "2026-07-08T06:32:56Z", "2026-07-08T06:32:57Z", "2026-07-08T06:32:58Z", "2026-07-08T06:32:59Z", "2026-07-08T06:33:00Z", "2026-07-08T06:33:01Z", "2026-07-08T06:33:02Z", "2026-07-08T06:33:03Z", "2026-07-08T06:33:04Z", "2026-07-08T06:33:05Z", "2026-07-08T06:33:06Z", "2026-07-08T06:33:07Z", "2026-07-08T06:33:08Z", "2026-07-08T06:33:09Z", "2026-07-08T06:33:10Z", "2026-07-08T06:33:11Z", "2026-07-08T06:33:12Z", "2026-07-08T06:33:13Z", "2026-07-08T06:33:14Z", "2026-07-08T06:33:15Z", "2026-07-08T06:33:16Z", "2026-07-08T06:33:17Z", "2026-07-08T06:33:18Z", "2026-07-08T06:33:19Z", "2026-07-08T06:33:20Z", "2026-07-08T06:33:21Z", "2026-07-08T06:33:22Z", "2026-07-08T06:33:23Z", "2026-07-08T06:33:24Z", "2026-07-08T06:33:25Z", "2026-07-08T06:33:26Z", "2026-07-08T06:33:27Z", "2026-07-08T06:33:28Z", "2026-07-08T06:33:29Z", "2026-07-08T06:33:30Z", "2026-07-08T06:33:31Z", "2026-07-08T06:33:32Z", "2026-07-08T06:33:33Z", "2026-07-08T06:33:34Z", "2026-07-08T06:33:35Z", "2026-07-08T06:33:36Z", "2026-07-08T06:33:37Z", "2026-07-08T06:33:38Z", "2026-07-08T06:33:39Z", "2026-07-08T06:33:40Z", "2026-07-08T06:33:41Z", "2026-07-08T06:33:42Z", "2026-07-08T06:33:43Z", "2026-07-08T06:33:44Z", "2026-07-08T06:33:45Z", "2026-07-08T06:33:46Z", "2026-07-08T06:33:47Z", "2026-07-08T06:33:48Z", "2026-07-08T06:33:49Z", "2026-07-08T06:33:50Z", "2026-07-08T06:33:51Z", "2026-07-08T06:33:52Z", "2026-07-08T06:33:53Z", "2026-07-08T06:33:54Z", "2026-07-08T06:33:55Z", "2026-07-08T06:33:56Z", "2026-07-08T06:33:57Z", "2026-07-08T06:33:58Z", "2026-07-08T06:33:59Z", "2026-07-08T06:34:00Z", "2026-07-08T06:34:01Z", "2026-07-08T06:34:02Z", "2026-07-08T06:34:03Z", "2026-07-08T06:34:04Z", "2026-07-08T06:34:05Z", "2026-07-08T06:34:06Z", "2026-07-08T06:34:07Z", "2026-07-08T06:34:08Z", "2026-07-08T06:34:09Z", "2026-07-08T06:34:10Z", "2026-07-08T06:34:11Z", "2026-07-08T06:34:12Z", "2026-07-08T06:34:13Z", "2026-07-08T06:34:14Z", "2026-07-08T06:34:15Z", "2026-07-08T06:34:16Z", "2026-07-08T06:34:17Z", "2026-07-08T06:34:18Z", "2026-07-08T06:34:19Z", "2026-07-08T06:34:20Z", "2026-07-08T06:34:21Z", "2026-07-08T06:34:22Z", "2026-07-08T06:34:23Z", "2026-07-08T06:34:24Z", "2026-07-08T06:34:25Z", "2026-07-08T06:34:26Z", "2026-07-08T06:34:27Z", "2026-07-08T06:34:28Z", "2026-07-08T06:34:29Z", "2026-07-08T06:34:30Z", "2026-07-08T06:34:31Z", "2026-07-08T06:34:32Z", "2026-07-08T06:34:33Z", "2026-07-08T06:34:34Z", "2026-07-08T06:34:35Z", "2026-07-08T06:34:36Z", "2026-07-08T06:34:37Z", "2026-07-08T06:34:38Z", "2026-07-08T06:34:39Z", "2026-07-08T06:34:40Z", "2026-07-08T06:34:41Z", "2026-07-08T06:34:42Z", "2026-07-08T06:34:43Z", "2026-07-08T06:34:44Z", "2026-07-08T06:34:45Z", "2026-07-08T06:34:46Z", "2026-07-08T06:34:47Z", "2026-07-08T06:34:48Z", "2026-07-08T06:34:49Z", "2026-07-08T06:34:50Z", "2026-07-08T06:34:51Z", "2026-07-08T06:34:52Z", "2026-07-08T06:34:53Z", "2026-07-08T06:34:54Z", "2026-07-08T06:34:55Z", "2026-07-08T06:34:56Z", "2026-07-08T06:34:57Z", "2026-07-08T06:34:58Z", "2026-07-08T06:34:59Z", "2026-07-08T06:35:00Z", "2026-07-08T06:35:01Z", "2026-07-08T06:35:02Z", "2026-07-08T06:35:03Z", "2026-07-08T06:35:04Z", "2026-07-08T06:35:05Z", "2026-07-08T06:35:06Z", "2026-07-08T06:35:07Z", "2026-07-08T06:35:08Z", "2026-07-08T06:35:09Z", "2026-07-08T06:35:10Z", "2026-07-08T06:35:11Z", "2026-07-08T06:35:12Z", "2026-07-08T06:35:13Z", "2026-07-08T06:35:14Z", "2026-07-08T06:35:15Z", "2026-07-08T06:35:16Z", "2026-07-08T06:35:17Z", "2026-07-08T06:35:18Z", "2026-07-08T06:35:19Z", "2026-07-08T06:35:20Z", "2026-07-08T06:35:21Z", "2026-07-08T06:35:22Z", "2026-07-08T06:35:23Z", "2026-07-08T06:35:24Z", "2026-07-08T06:35:25Z", "2026-07-08T06:35:26Z", "2026-07-08T06:35:27Z", "2026-07-08T06:35:28Z", "2026-07-08T06:35:29Z", "2026-07-08T06:35:30Z", "2026-07-08T06:35:31Z", "2026-07-08T06:35:32Z", "2026-07-08T06:35:33Z", "2026-07-08T06:35:34Z", "2026-07-08T06:35:35Z", "2026-07-08T06:35:36Z", "2026-07-08T06:35:37Z", "2026-07-08T06:35:38Z", "2026-07-08T06:35:39Z", "2026-07-08T06:35:40Z", "2026-07-08T06:35:41Z", "2026-07-08T06:35:42Z", "2026-07-08T06:35:43Z", "2026-07-08T06:35:44Z", "2026-07-08T06:35:45Z", "2026-07-08T06:35:46Z", "2026-07-08T06:35:47Z", "2026-07-08T06:35:48Z", "2026-07-08T06:35:49Z", "2026-07-08T06:35:50Z", "2026-07-08T06:35:51Z", "2026-07-08T06:35:52Z", "2026-07-08T06:35:53Z", "2026-07-08T06:35:54Z", "2026-07-08T06:35:55Z", "2026-07-08T06:35:56Z", "2026-07-08T06:35:57Z", "2026-07-08T06:35:58Z", "2026-07-08T06:35:59Z", "2026-07-08T06:36:00Z", "2026-07-08T06:36:01Z", "2026-07-08T06:36:02Z", "2026-07-08T06:36:03Z", "2026-07-08T06:36:04Z", "2026-07-08T06:36:05Z", "2026-07-08T06:36:06Z", "2026-07-08T06:36:07Z", "2026-07-08T06:36:08Z", "2026-07-08T06:36:09Z", "2026-07-08T06:36:10Z", "2026-07-08T06:36:11Z", "2026-07-08T06:36:12Z", "2026-07-08T06:36:13Z", "2026-07-08T06:36:14Z", "2026-07-08T06:36:15Z", "2026-07-08T06:36:16Z", "2026-07-08T06:36:17Z", "2026-07-08T06:36:18Z", "2026-07-08T06:36:19Z", "2026-07-08T06:36:20Z", "2026-07-08T06:36:21Z", "2026-07-08T06:36:22Z", "2026-07-08T06:36:23Z", "2026-07-08T06:36:24Z", "2026-07-08T06:36:25Z", "2026-07-08T06:36:26Z", "2026-07-08T06:36:27Z", "2026-07-08T06:36:28Z", "2026-07-08T06:36:29Z", "2026-07-08T06:36:30Z", "2026-07-08T06:36:31Z", "2026-07-08T06:36:32Z", "2026-07-08T06:36:33Z", "2026-07-08T06:36:34Z", "2026-07-08T06:36:35Z", "2026-07-08T06:36:36Z", "2026-07-08T06:36:37Z", "2026-07-08T06:36:38Z", "2026-07-08T06:36:39Z", "2026-07-08T06:36:40Z", "2026-07-08T06:36:41Z", "2026-07-08T06:36:42Z", "2026-07-08T06:36:43Z", "2026-07-08T06:36:44Z", "2026-07-08T06:36:45Z", "2026-07-08T06:36:46Z", "2026-07-08T06:36:47Z", "2026-07-08T06:36:48Z", "2026-07-08T06:36:49Z", "2026-07-08T06:36:50Z", "2026-07-08T06:36:51Z", "2026-07-08T06:36:52Z", "2026-07-08T06:36:53Z", "2026-07-08T06:36:54Z", "2026-07-08T06:36:55Z", "2026-07-08T06:36:56Z", "2026-07-08T06:36:57Z", "2026-07-08T06:36:58Z", "2026-07-08T06:36:59Z", "2026-07-08T06:37:00Z", "2026-07-08T06:37:01Z", "2026-07-08T06:37:02Z", "2026-07-08T06:37:03Z", "2026-07-08T06:37:04Z", "2026-07-08T06:37:05Z", "2026-07-08T06:37:06Z", "2026-07-08T06:37:07Z", "2026-07-08T06:37:08Z", "2026-07-08T06:37:09Z", "2026-07-08T06:37:10Z", "2026-07-08T06:37:11Z", "2026-07-08T06:37:12Z", "2026-07-08T06:37:13Z", "2026-07-08T06:37:14Z", "2026-07-08T06:37:15Z", "2026-07-08T06:37:16Z", "2026-07-08T06:37:17Z", "2026-07-08T06:37:18Z", "2026-07-08T06:37:19Z", "2026-07-08T06:37:20Z", "2026-07-08T06:37:21Z", "2026-07-08T06:37:22Z", "2026-07-08T06:37:23Z", "2026-07-08T06:37:24Z", "2026-07-08T06:37:25Z", "2026-07-08T06:37:26Z", "2026-07-08T06:37:27Z", "2026-07-08T06:37:28Z", "2026-07-08T06:37:29Z", "2026-07-08T06:37:30Z", "2026-07-08T06:37:31Z", "2026-07-08T06:37:32Z", "2026-07-08T06:37:33Z", "2026-07-08T06:37:34Z", "2026-07-08T06:37:35Z", "2026-07-08T06:37:36Z", "2026-07-08T06:37:37Z", "2026-07-08T06:37:38Z", "2026-07-08T06:37:39Z", "2026-07-08T06:37:40Z", "2026-07-08T06:37:41Z", "2026-07-08T06:37:42Z", "2026-07-08T06:37:43Z", "2026-07-08T06:37:44Z", "2026-07-08T06:37:45Z"],
+            lat: [24.475527, 24.475489, 24.475452, 24.475415, 24.475377, 24.47534, 24.475302, 24.475265, 24.475227, 24.475189, 24.475152, 24.475114, 24.475076, 24.475039, 24.475001, 24.474963, 24.474925, 24.474888, 24.47485, 24.474812, 24.474774, 24.474736, 24.474698, 24.474661, 24.474623, 24.474585, 24.474547, 24.474509, 24.474471, 24.474433, 24.474395, 24.474357, 24.474319, 24.474281, 24.474243, 24.474206, 24.474168, 24.47413, 24.474092, 24.474054, 24.474016, 24.473978, 24.47394, 24.473902, 24.473864, 24.473826, 24.473788, 24.47375, 24.473713, 24.473675, 24.473637, 24.473599, 24.473561, 24.473523, 24.473484, 24.473446, 24.473408, 24.47337, 24.473332, 24.473294, 24.473255, 24.473217, 24.473179, 24.473141, 24.473103, 24.473064, 24.473026, 24.472988, 24.47295, 24.472912, 24.472874, 24.472836, 24.472798, 24.47276, 24.472722, 24.472685, 24.472647, 24.472609, 24.472571, 24.472534, 24.472496, 24.472458, 24.47242, 24.472382, 24.472344, 24.472306, 24.472268, 24.47223, 24.472191, 24.472153, 24.472114, 24.472076, 24.472037, 24.471998, 24.471959, 24.47192, 24.471882, 24.471843, 24.471804, 24.471765, 24.471727, 24.471688, 24.47165, 24.471612, 24.471575, 24.471537, 24.471499, 24.471461, 24.471424, 24.471387, 24.47135, 24.471312, 24.471275, 24.471238, 24.471201, 24.471164, 24.471127, 24.471091, 24.471054, 24.471017, 24.47098, 24.470943, 24.470906, 24.47087, 24.470833, 24.470796, 24.470759, 24.470722, 24.470685, 24.470649, 24.470612, 24.470575, 24.470538, 24.470502, 24.470465, 24.470428, 24.470391, 24.470354, 24.470318, 24.470281, 24.470244, 24.470207, 24.470171, 24.470134, 24.470097, 24.47006, 24.470023, 24.469986, 24.46995, 24.469913, 24.469876, 24.46984, 24.469803, 24.469766, 24.469729, 24.469693, 24.469656, 24.469619, 24.469582, 24.469545, 24.469508, 24.46947, 24.469433, 24.469396, 24.469359, 24.469321, 24.469284, 24.469247, 24.469209, 24.469172, 24.469134, 24.469097, 24.469059, 24.469021, 24.468984, 24.468946, 24.468908, 24.468871, 24.468834, 24.468796, 24.468759, 24.468722, 24.468684, 24.468647, 24.46861, 24.468573, 24.468536, 24.468498, 24.468461, 24.468424, 24.468387, 24.46835, 24.468313, 24.468275, 24.468238, 24.468201, 24.468164, 24.468127, 24.46809, 24.468052, 24.468015, 24.467978, 24.46794, 24.467903, 24.467865, 24.467828, 24.467791, 24.467753, 24.467716, 24.467678, 24.467641, 24.467603, 24.467565, 24.467528, 24.46749, 24.467452, 24.467415, 24.467377, 24.467339, 24.467301, 24.467263, 24.467225, 24.467188, 24.46715, 24.467112, 24.467074, 24.467037, 24.466999, 24.466961, 24.466924, 24.466886, 24.466849, 24.466811, 24.466773, 24.466736, 24.466698, 24.466661, 24.466623, 24.466586, 24.466548, 24.466511, 24.466473, 24.466436, 24.466398, 24.466361, 24.466323, 24.466286, 24.466248, 24.466211, 24.466173, 24.466136, 24.466098, 24.466061, 24.466023, 24.465986, 24.465948, 24.46591, 24.465872, 24.465834, 24.465796, 24.465758, 24.465719, 24.465681, 24.465643, 24.465604, 24.465566, 24.465527, 24.465489, 24.465451, 24.465412, 24.465374, 24.465335, 24.465297, 24.465259, 24.46522, 24.465182, 24.465143, 24.465105, 24.465066, 24.465028, 24.46499, 24.464951, 24.464913, 24.464874, 24.464835, 24.464796, 24.464757, 24.464719, 24.46468, 24.464641, 24.464602, 24.464563, 24.464524, 24.464486, 24.464447, 24.464408, 24.464369, 24.46433, 24.464292, 24.464253, 24.464214, 24.464175, 24.464136, 24.464098, 24.464059, 24.46402, 24.463981, 24.463942, 24.463903, 24.463864, 24.463825, 24.463786, 24.463746, 24.463707, 24.463668, 24.463629, 24.463589, 24.46355, 24.463511, 24.463472, 24.463432, 24.463393, 24.463354, 24.463315, 24.463275, 24.463236, 24.463197, 24.463158, 24.463119, 24.46308, 24.46304, 24.463001, 24.462962, 24.462923, 24.462884, 24.462845, 24.462806, 24.462766, 24.462727, 24.462688, 24.462648, 24.462609, 24.46257, 24.46253, 24.462491, 24.462452, 24.462412, 24.462373, 24.462333, 24.462294, 24.462254, 24.462215, 24.462175, 24.462136, 24.462097, 24.462058, 24.462018, 24.461979, 24.46194, 24.461901, 24.461862, 24.461823, 24.461784, 24.461745, 24.461706, 24.461667, 24.461628, 24.461589, 24.46155, 24.461512, 24.461473, 24.461434, 24.461396, 24.461357, 24.461319, 24.46128, 24.461242, 24.461204, 24.461165, 24.461127, 24.461089, 24.461051, 24.461013, 24.460975, 24.460937, 24.4609, 24.460862, 24.460824, 24.460786, 24.460748, 24.46071, 24.460673, 24.460635, 24.460597, 24.46056, 24.460522, 24.460485, 24.460447, 24.46041, 24.460372, 24.460335, 24.460298, 24.460261, 24.460224, 24.460187, 24.46015, 24.460114, 24.460077, 24.460041, 24.460005, 24.459969, 24.459933, 24.459897, 24.459861, 24.459825, 24.459789, 24.459753, 24.459717, 24.459681, 24.459645, 24.45961, 24.459574, 24.459538, 24.459503, 24.459467, 24.459432, 24.459396, 24.45936, 24.459325, 24.459289, 24.459254, 24.459218, 24.459183, 24.459148, 24.459112, 24.459077, 24.459042, 24.459006, 24.458971, 24.458936, 24.4589, 24.458865, 24.458829, 24.458794, 24.458758, 24.458723, 24.458687, 24.458652, 24.458616, 24.458581, 24.458546, 24.45851, 24.458475, 24.45844, 24.458404, 24.458369, 24.458333, 24.458298, 24.458263, 24.458227, 24.458192, 24.458157, 24.458121, 24.458086, 24.45805, 24.458015, 24.457979, 24.457944, 24.457908, 24.457873, 24.457837, 24.457802, 24.457766, 24.457731, 24.457695, 24.45766, 24.457624, 24.457589, 24.457553, 24.457518, 24.457483, 24.457448, 24.457412, 24.457377, 24.457342, 24.457307, 24.457272, 24.457237, 24.457201, 24.457166, 24.457131, 24.457096, 24.457061, 24.457026, 24.456991, 24.456956, 24.456921, 24.456886, 24.456851, 24.456816, 24.456781, 24.456746, 24.456711, 24.456677, 24.456642, 24.456607, 24.456572, 24.456538, 24.456503, 24.456468, 24.456433, 24.456398, 24.456363, 24.456328, 24.456292, 24.456257, 24.456221, 24.456186, 24.45615, 24.456114, 24.456078, 24.456042, 24.456007, 24.455971, 24.455935, 24.455899, 24.455863, 24.455827, 24.455792, 24.455756, 24.455721, 24.455685, 24.45565, 24.455614, 24.455579, 24.455543, 24.455508, 24.455472, 24.455437, 24.455402, 24.455367, 24.455332, 24.455297, 24.455263, 24.455228, 24.455194, 24.45516, 24.455126, 24.455093, 24.455059, 24.455025, 24.454992, 24.454958, 24.454924, 24.454891, 24.454857, 24.454823, 24.454789, 24.454755, 24.45472, 24.454686, 24.454651, 24.454616, 24.454581, 24.454546, 24.45451, 24.454475, 24.45444, 24.454404, 24.454369, 24.454334, 24.454298, 24.454263, 24.454228, 24.454194, 24.454159, 24.454125, 24.45409, 24.454056, 24.454021, 24.453987, 24.453953, 24.453918, 24.453884, 24.45385, 24.453816, 24.453782, 24.453748, 24.453714, 24.45368, 24.453646, 24.453612, 24.453578, 24.453543, 24.453509, 24.453475, 24.453441, 24.453406, 24.453372, 24.453338, 24.453304, 24.453269, 24.453235, 24.4532, 24.453166, 24.453131, 24.453097, 24.453062, 24.453028, 24.452993, 24.452959, 24.452924, 24.452889, 24.452855, 24.45282, 24.452785, 24.452751, 24.452716, 24.452681, 24.452647, 24.452612, 24.452577, 24.452542, 24.452508, 24.452473, 24.452438, 24.452403, 24.452368, 24.452334, 24.452299, 24.452264, 24.45223, 24.452195, 24.452161, 24.452126, 24.452092, 24.452057, 24.452023, 24.451988, 24.451953, 24.451919, 24.451884, 24.451849, 24.451814, 24.45178, 24.451745, 24.45171, 24.451675, 24.451641, 24.451606, 24.451571, 24.451536, 24.451502, 24.451467, 24.451432, 24.451398, 24.451363, 24.451329, 24.451294, 24.45126, 24.451225, 24.451191, 24.451157, 24.451122, 24.451088, 24.451054, 24.45102, 24.450986, 24.450952, 24.450918, 24.450884, 24.45085, 24.450816, 24.450782, 24.450749, 24.450715, 24.450681, 24.450647, 24.450614, 24.45058, 24.450546, 24.450513, 24.450479, 24.450445, 24.450412, 24.450378, 24.450344, 24.45031, 24.450277, 24.450243, 24.450209, 24.450176, 24.450142, 24.450108, 24.450075, 24.450041, 24.450007, 24.449974, 24.44994, 24.449906, 24.449872, 24.449839, 24.449805, 24.449771, 24.449737, 24.449703, 24.449669, 24.449635, 24.449602, 24.449568, 24.449534, 24.4495, 24.449466, 24.449432, 24.449398, 24.449365, 24.449331, 24.449297, 24.449263, 24.449229, 24.449195, 24.449162, 24.449128, 24.449094, 24.44906, 24.449026, 24.448993, 24.448959, 24.448925, 24.448891, 24.448857, 24.448823, 24.448789, 24.448755, 24.448722, 24.448688, 24.448653, 24.448619, 24.448585, 24.448551, 24.448517, 24.448483, 24.448449, 24.448415, 24.44838, 24.448346, 24.448312, 24.448278, 24.448243, 24.448209, 24.448175, 24.448141, 24.448107, 24.448072, 24.448038, 24.448004, 24.44797, 24.447935, 24.447901, 24.447867, 24.447832, 24.447798, 24.447763, 24.447729, 24.447695, 24.44766, 24.447626, 24.447591, 24.447557, 24.447523, 24.447488, 24.447454, 24.44742, 24.447386, 24.447351, 24.447317, 24.447283, 24.447249, 24.447215, 24.447181, 24.447146, 24.447112, 24.447078, 24.447044, 24.44701, 24.446976, 24.446941, 24.446907, 24.446873, 24.446839, 24.446805, 24.44677, 24.446736, 24.446702, 24.446668, 24.446634, 24.4466, 24.446566, 24.446532, 24.446498, 24.446464, 24.44643, 24.446396, 24.446362, 24.446328, 24.446294, 24.44626, 24.446226, 24.446192, 24.446158, 24.446125, 24.446091, 24.446057, 24.446023, 24.44599, 24.445956, 24.445922, 24.445888, 24.445855, 24.445821, 24.445787, 24.445754, 24.44572, 24.445686, 24.445653, 24.445619, 24.445585, 24.445551, 24.445518, 24.445484, 24.44545, 24.445416, 24.445383, 24.445349, 24.445315, 24.445281, 24.445248, 24.445214, 24.44518, 24.445146, 24.445112, 24.445079, 24.445045, 24.445011, 24.444977, 24.444943, 24.444909, 24.444875, 24.444842, 24.444808, 24.444774, 24.44474, 24.444706, 24.444672, 24.444638, 24.444604, 24.44457, 24.444537, 24.444503, 24.444469, 24.444435, 24.444402, 24.444368, 24.444335, 24.444301, 24.444268, 24.444235, 24.444201, 24.444167, 24.444134, 24.4441, 24.444067, 24.444033, 24.443999, 24.443966, 24.443932, 24.443898, 24.443864, 24.44383, 24.443796, 24.443761, 24.443727, 24.443692, 24.443658, 24.443623, 24.443589, 24.443554, 24.443519, 24.443484, 24.44345, 24.443415, 24.44338, 24.443346, 24.443311, 24.443276, 24.443241, 24.443207, 24.443172, 24.443137, 24.443102, 24.443068, 24.443033, 24.442998, 24.442964, 24.442929, 24.442894, 24.44286, 24.442825, 24.442791, 24.442756, 24.442722, 24.442688, 24.442653, 24.442619, 24.442585, 24.44255, 24.442516, 24.442482, 24.442448, 24.442414, 24.442379, 24.442345, 24.442311, 24.442277, 24.442243, 24.442209, 24.442175, 24.442141, 24.442107, 24.442073, 24.442039, 24.442005, 24.441971, 24.441937, 24.441903, 24.441869, 24.441835, 24.441801, 24.441767, 24.441733, 24.441699, 24.441665, 24.441631, 24.441597, 24.441563, 24.441528, 24.441495, 24.441461, 24.441426, 24.441393, 24.441358, 24.441324, 24.44129, 24.441256, 24.441222, 24.441188, 24.441154, 24.44112, 24.441086, 24.441052, 24.441018, 24.440984, 24.44095, 24.440916, 24.440882, 24.440848, 24.440815, 24.440781, 24.440747, 24.440713, 24.44068, 24.440646, 24.440612, 24.440578, 24.440545, 24.440511, 24.440477, 24.440443, 24.44041, 24.440376, 24.440342, 24.440308, 24.440274, 24.440241, 24.440207, 24.440173, 24.440139, 24.440106, 24.440072, 24.440038, 24.440004, 24.439971, 24.439937, 24.439903, 24.439869, 24.439836, 24.439802, 24.439769, 24.439735, 24.439701, 24.439667, 24.439634, 24.4396, 24.439566, 24.439532, 24.439499, 24.439465, 24.439431, 24.439398, 24.439364, 24.43933, 24.439296, 24.439263, 24.439229, 24.439195, 24.439162, 24.439128, 24.439095, 24.439061, 24.439028, 24.438994, 24.43896, 24.438927, 24.438894, 24.43886, 24.438827, 24.438793, 24.43876, 24.438726, 24.438693, 24.438659, 24.438626, 24.438592, 24.438559, 24.438525, 24.438492, 24.438458, 24.438425, 24.438391, 24.438358, 24.438324, 24.438291, 24.438257, 24.438224, 24.43819, 24.438156, 24.438122, 24.438089, 24.438055, 24.438021, 24.437987, 24.437953, 24.437919, 24.437885, 24.437851, 24.437816, 24.437782, 24.437748, 24.437714, 24.437679, 24.437645, 24.437611, 24.437577, 24.437543, 24.437508, 24.437474, 24.43744, 24.437406, 24.437372, 24.437337, 24.437303, 24.437269, 24.437235, 24.4372, 24.437166, 24.437131, 24.437097, 24.437062, 24.437028, 24.436993, 24.436958, 24.436924, 24.436889, 24.436854, 24.436821, 24.436787, 24.436752, 24.436718, 24.436683, 24.436647, 24.436611, 24.436576, 24.436539, 24.436503, 24.436466, 24.43643, 24.436393, 24.436356, 24.436319, 24.436282, 24.436246, 24.436209, 24.436172, 24.436135, 24.436099, 24.436062, 24.436026, 24.43599, 24.435955, 24.43592, 24.435885, 24.43585, 24.435816, 24.435782, 24.435749, 24.435715, 24.43568, 24.435646, 24.435612, 24.435577, 24.435543, 24.435508, 24.435474, 24.435439, 24.435405, 24.435371, 24.435336, 24.435302, 24.435268, 24.435233, 24.435199, 24.435164, 24.43513, 24.435095, 24.435061, 24.435026, 24.434992, 24.434957, 24.434923, 24.434888, 24.434853, 24.434819, 24.434784, 24.43475, 24.434715, 24.43468, 24.434646, 24.434611, 24.434577, 24.434542, 24.434508, 24.434473, 24.434438, 24.434404, 24.434369, 24.434335, 24.4343, 24.434266, 24.434231, 24.434197, 24.434162, 24.434128, 24.434094, 24.434059, 24.434025, 24.43399, 24.433956, 24.433921, 24.433887, 24.433852, 24.433818, 24.433784, 24.433749, 24.433715, 24.43368, 24.433646, 24.433611, 24.433577, 24.433542, 24.433508, 24.433473, 24.433438, 24.433404, 24.433369, 24.433335, 24.4333, 24.433265, 24.433231, 24.433196, 24.433162, 24.433127, 24.433093, 24.433058, 24.433024, 24.432989, 24.432954, 24.43292, 24.432885, 24.432851, 24.432816, 24.432782, 24.432747, 24.432713, 24.432678, 24.432644, 24.432609, 24.432574, 24.43254, 24.432505, 24.432471, 24.432436, 24.432401, 24.432367, 24.432332, 24.432298, 24.432263, 24.432229, 24.432194, 24.432159, 24.432125, 24.43209, 24.432055, 24.432021, 24.431986, 24.431951, 24.431916, 24.431882, 24.431847, 24.431812, 24.431777, 24.431742, 24.431707, 24.431672, 24.431638, 24.431603, 24.431568, 24.431533, 24.431498, 24.431463, 24.431428, 24.431393, 24.431358, 24.431323, 24.431288, 24.431253, 24.431219, 24.431184, 24.431149, 24.431114, 24.431079, 24.431044, 24.43101, 24.430975, 24.43094, 24.430905, 24.430871, 24.430836, 24.430802, 24.430767, 24.430733, 24.430698, 24.430664, 24.43063, 24.430595, 24.430561, 24.430527, 24.430492, 24.430458, 24.430424, 24.43039, 24.430355, 24.430321, 24.430287, 24.430253, 24.430219, 24.430184, 24.43015, 24.430116, 24.430082, 24.430048, 24.430014, 24.42998, 24.429945, 24.429911, 24.429877, 24.429843, 24.429809, 24.429775, 24.429741, 24.429707, 24.429673, 24.429639, 24.429605, 24.429571, 24.429537, 24.429503, 24.429469, 24.429435, 24.429401, 24.429367, 24.429333, 24.429298, 24.429264, 24.42923, 24.429195, 24.429161, 24.429127, 24.429092, 24.429058, 24.429023, 24.428989, 24.428955, 24.42892, 24.428886, 24.428852, 24.428817, 24.428783, 24.428749, 24.428715, 24.428681, 24.428647, 24.428613, 24.428579, 24.428545, 24.428511, 24.428478, 24.428444, 24.428411, 24.428377, 24.428343, 24.42831, 24.428276, 24.428243, 24.428209, 24.428176, 24.428142, 24.428109, 24.428075, 24.428042, 24.428008, 24.427974, 24.427941, 24.427907, 24.427874, 24.42784, 24.427807, 24.427773, 24.427739, 24.427706, 24.427672, 24.427638, 24.427605, 24.427571, 24.427537, 24.427504, 24.42747, 24.427436, 24.427403, 24.427369, 24.427336, 24.427302, 24.427269, 24.427235, 24.427202, 24.427168, 24.427135, 24.427101, 24.427068, 24.427034, 24.427, 24.426966, 24.426932, 24.426898, 24.426864, 24.426829, 24.426795, 24.42676, 24.426726, 24.426692, 24.426657, 24.426623, 24.426589, 24.426555, 24.426521, 24.426487, 24.426453, 24.426419, 24.426386, 24.426352, 24.426319, 24.426286, 24.426253, 24.42622, 24.426187, 24.426153, 24.42612, 24.426087, 24.426054, 24.426021, 24.425987, 24.425954, 24.425921, 24.425887, 24.425854, 24.42582, 24.425787, 24.425753, 24.42572, 24.425686, 24.425653, 24.425619, 24.425586, 24.425552, 24.425519, 24.425485, 24.425452, 24.425419, 24.425385, 24.425352, 24.425319, 24.425285, 24.425252, 24.425219, 24.425185, 24.425152, 24.425118, 24.425085, 24.425051, 24.425018, 24.424984, 24.424951, 24.424918, 24.424884, 24.424851, 24.424818, 24.424784, 24.424751, 24.424718, 24.424684, 24.424651, 24.424618, 24.424584, 24.424551, 24.424518, 24.424484, 24.424451, 24.424417, 24.424384, 24.42435, 24.424316, 24.424282, 24.424248, 24.424214, 24.42418, 24.424146, 24.424112, 24.424078, 24.424043, 24.424009, 24.423975, 24.423941, 24.423906, 24.423872, 24.423838, 24.423804, 24.423769, 24.423735, 24.423701, 24.423667, 24.423633, 24.423599, 24.423565, 24.423531, 24.423497, 24.423463, 24.423429, 24.423395, 24.423361, 24.423327, 24.423293, 24.423259, 24.423225, 24.423191, 24.423157, 24.423123, 24.423089, 24.423055, 24.423021, 24.422987, 24.422953, 24.422918, 24.422884, 24.42285, 24.422816, 24.422781, 24.422747, 24.422713, 24.422679, 24.422645, 24.42261, 24.422576, 24.422542, 24.422508, 24.422474, 24.42244, 24.422406, 24.422372, 24.422338, 24.422304, 24.422269, 24.422235, 24.422201, 24.422167, 24.422133, 24.422099, 24.422065, 24.422031, 24.421997, 24.421964, 24.42193, 24.421895, 24.421861, 24.421827, 24.421793, 24.421759, 24.421725, 24.42169, 24.421656, 24.421622, 24.421587, 24.421553, 24.421519, 24.421484, 24.42145, 24.421415, 24.42138, 24.421346, 24.421311, 24.421276, 24.421241, 24.421206, 24.421171, 24.421137, 24.421102, 24.421067, 24.421032, 24.420998, 24.420963, 24.420928, 24.420894, 24.420859, 24.420824, 24.42079, 24.420755, 24.420721, 24.420686, 24.420652, 24.420617, 24.420584, 24.420549, 24.420514, 24.420479, 24.420444, 24.420409, 24.420373, 24.420338, 24.420303, 24.420268, 24.420233, 24.420197, 24.420162, 24.420127, 24.420092, 24.420056, 24.420021, 24.419985, 24.41995, 24.419914, 24.419879, 24.419843, 24.419809, 24.419773, 24.419737, 24.419701, 24.419665, 24.419629, 24.419593, 24.419557, 24.419521, 24.419483, 24.419447, 24.419411, 24.419374, 24.419338, 24.419303, 24.419267, 24.419231, 24.419196, 24.41916, 24.419125, 24.41909, 24.419054, 24.419019, 24.418985, 24.41895, 24.418915, 24.41888, 24.418845, 24.418812, 24.418777, 24.418741, 24.418704, 24.418668, 24.418632, 24.418596, 24.41856, 24.418524, 24.418488, 24.418453, 24.418417, 24.418381, 24.418345, 24.41831, 24.418274, 24.418238, 24.418203, 24.418168, 24.418132, 24.418097, 24.418062, 24.418027, 24.417992, 24.417957, 24.417922, 24.417887, 24.417852, 24.417817, 24.417782, 24.417747, 24.41771, 24.417675, 24.417639, 24.417603, 24.417567, 24.417532, 24.417496, 24.41746, 24.417424, 24.417388, 24.417352, 24.417316, 24.41728, 24.417244, 24.417208, 24.417172, 24.417136, 24.4171, 24.417064, 24.417028, 24.416992, 24.416955, 24.416919, 24.416883, 24.416847, 24.416811, 24.416775, 24.416739, 24.416703, 24.416666, 24.41663, 24.416594, 24.416557, 24.416521, 24.416484, 24.416448, 24.416411, 24.416374, 24.416338, 24.416301, 24.416264, 24.416227, 24.41619, 24.416153, 24.416116, 24.416079, 24.416042, 24.416005, 24.415968, 24.415931, 24.415894, 24.415857, 24.41582, 24.415784, 24.415747, 24.41571, 24.415674, 24.415637, 24.415601, 24.415565, 24.415528, 24.415492, 24.415455, 24.415419, 24.415382, 24.415346, 24.415309, 24.415273, 24.415237, 24.4152, 24.415164, 24.415127, 24.415091, 24.415054, 24.415018, 24.414981, 24.414944, 24.414908, 24.414871, 24.414835, 24.414798, 24.414762, 24.414725, 24.414689, 24.414653, 24.414616, 24.41458, 24.414543, 24.414507, 24.41447, 24.414433, 24.414397, 24.41436, 24.414323, 24.414287, 24.41425, 24.414214, 24.414177, 24.41414, 24.414104, 24.414067, 24.41403, 24.413993, 24.413956, 24.413919, 24.413882, 24.413845, 24.413808, 24.413772, 24.413735, 24.413698, 24.413661, 24.413624, 24.413588, 24.413551, 24.413514, 24.413477, 24.41344, 24.413404, 24.413367, 24.41333, 24.413293, 24.413257, 24.41322, 24.413183, 24.413146, 24.41311, 24.413073, 24.413036, 24.412999, 24.412962, 24.412925, 24.412888, 24.412851, 24.412815, 24.412778, 24.412741, 24.412704, 24.412667, 24.41263, 24.412593, 24.412556, 24.412519, 24.412482, 24.412445, 24.412408, 24.412371, 24.412334, 24.412297, 24.41226, 24.412223, 24.412186, 24.412149, 24.412112, 24.412075, 24.412037, 24.412, 24.411963, 24.411925, 24.411888],
+            lon: [-79.968587, -79.968647, -79.968708, -79.968769, -79.968829, -79.96889, -79.96895, -79.969011, -79.969072, -79.969132, -79.969193, -79.969254, -79.969314, -79.969375, -79.969436, -79.969496, -79.969557, -79.969617, -79.969678, -79.969738, -79.969799, -79.96986, -79.96992, -79.969981, -79.970041, -79.970102, -79.970162, -79.970222, -79.970283, -79.970343, -79.970403, -79.970464, -79.970524, -79.970584, -79.970644, -79.970705, -79.970765, -79.970825, -79.970886, -79.970946, -79.971007, -79.971067, -79.971128, -79.971188, -79.971249, -79.971309, -79.97137, -79.97143, -79.971491, -79.971551, -79.971612, -79.971673, -79.971733, -79.971793, -79.971854, -79.971914, -79.971974, -79.972034, -79.972095, -79.972155, -79.972215, -79.972275, -79.972335, -79.972396, -79.972456, -79.972516, -79.972576, -79.972636, -79.972696, -79.972757, -79.972817, -79.972877, -79.972938, -79.972998, -79.973058, -79.973118, -79.973178, -79.973238, -79.973298, -79.973358, -79.973419, -79.973479, -79.97354, -79.973601, -79.973662, -79.973723, -79.973785, -79.973847, -79.973908, -79.97397, -79.974033, -79.974095, -79.974157, -79.97422, -79.974282, -79.974345, -79.974407, -79.97447, -79.974532, -79.974595, -79.974657, -79.974719, -79.97478, -79.974842, -79.974903, -79.974964, -79.975025, -79.975086, -79.975147, -79.975208, -79.975269, -79.97533, -79.97539, -79.975451, -79.975512, -79.975572, -79.975633, -79.975693, -79.975754, -79.975814, -79.975875, -79.975936, -79.975996, -79.976057, -79.976118, -79.976179, -79.97624, -79.976301, -79.976362, -79.976423, -79.976484, -79.976545, -79.976606, -79.976667, -79.976728, -79.976789, -79.97685, -79.976912, -79.976973, -79.977034, -79.977096, -79.977157, -79.977218, -79.97728, -79.977341, -79.977403, -79.977464, -79.977526, -79.977587, -79.977649, -79.97771, -79.977772, -79.977834, -79.977895, -79.977957, -79.978019, -79.97808, -79.978142, -79.978204, -79.978266, -79.978328, -79.97839, -79.978452, -79.978514, -79.978576, -79.978638, -79.978701, -79.978763, -79.978825, -79.978888, -79.97895, -79.979013, -79.979076, -79.979138, -79.979201, -79.979263, -79.979326, -79.979388, -79.97945, -79.979512, -79.979574, -79.979636, -79.979698, -79.979759, -79.979821, -79.979883, -79.979944, -79.980006, -79.980067, -79.980128, -79.98019, -79.980251, -79.980313, -79.980374, -79.980436, -79.980497, -79.980559, -79.980621, -79.980682, -79.980744, -79.980806, -79.980868, -79.98093, -79.980992, -79.981054, -79.981116, -79.981178, -79.98124, -79.981302, -79.981364, -79.981427, -79.981489, -79.981551, -79.981613, -79.981675, -79.981737, -79.9818, -79.981862, -79.981924, -79.981986, -79.982048, -79.98211, -79.982172, -79.982234, -79.982296, -79.982358, -79.982419, -79.982481, -79.982542, -79.982603, -79.982665, -79.982726, -79.982787, -79.982848, -79.982909, -79.98297, -79.98303, -79.983091, -79.983152, -79.983212, -79.983273, -79.983333, -79.983394, -79.983454, -79.983515, -79.983575, -79.983635, -79.983695, -79.983756, -79.983816, -79.983877, -79.983937, -79.983997, -79.984057, -79.984117, -79.984177, -79.984238, -79.984298, -79.984358, -79.984418, -79.984478, -79.984538, -79.984598, -79.984658, -79.984718, -79.984778, -79.984838, -79.984897, -79.984956, -79.985016, -79.985075, -79.985134, -79.985193, -79.985252, -79.985311, -79.985369, -79.985428, -79.985487, -79.985546, -79.985604, -79.985663, -79.985722, -79.98578, -79.985839, -79.985898, -79.985957, -79.986016, -79.986074, -79.986133, -79.986192, -79.986251, -79.98631, -79.986369, -79.986428, -79.986487, -79.986545, -79.986604, -79.986663, -79.986722, -79.98678, -79.986839, -79.986898, -79.986956, -79.987015, -79.987074, -79.987132, -79.987191, -79.987249, -79.987308, -79.987366, -79.987425, -79.987483, -79.987542, -79.9876, -79.987659, -79.987718, -79.987776, -79.987835, -79.987893, -79.987952, -79.988011, -79.988069, -79.988128, -79.988187, -79.988245, -79.988304, -79.988363, -79.988422, -79.98848, -79.988539, -79.988598, -79.988657, -79.988716, -79.988775, -79.988835, -79.988894, -79.988954, -79.989014, -79.989073, -79.989133, -79.989193, -79.989253, -79.989314, -79.989374, -79.989434, -79.989495, -79.989555, -79.989615, -79.989676, -79.989737, -79.989797, -79.989858, -79.989918, -79.989979, -79.990039, -79.990099, -79.990159, -79.990219, -79.990279, -79.990339, -79.990398, -79.990458, -79.990517, -79.990577, -79.990636, -79.990695, -79.990754, -79.990813, -79.990872, -79.990931, -79.990989, -79.991048, -79.991107, -79.991166, -79.991225, -79.991284, -79.991343, -79.991402, -79.991462, -79.991521, -79.991581, -79.99164, -79.9917, -79.99176, -79.991821, -79.991881, -79.991941, -79.992002, -79.992063, -79.992124, -79.992185, -79.992246, -79.992307, -79.992368, -79.992429, -79.99249, -79.992551, -79.992612, -79.992673, -79.992734, -79.992795, -79.992856, -79.992917, -79.992978, -79.993039, -79.9931, -79.99316, -79.993221, -79.993282, -79.993343, -79.993403, -79.993464, -79.993525, -79.993586, -79.993647, -79.993709, -79.99377, -79.993832, -79.993893, -79.993955, -79.994017, -79.994079, -79.994141, -79.994204, -79.994266, -79.994329, -79.994391, -79.994454, -79.994517, -79.99458, -79.994643, -79.994705, -79.994768, -79.99483, -79.994893, -79.994955, -79.995018, -79.99508, -79.995143, -79.995205, -79.995267, -79.99533, -79.995392, -79.995454, -79.995517, -79.995579, -79.995641, -79.995704, -79.995766, -79.995828, -79.995891, -79.995953, -79.996016, -79.996078, -79.996141, -79.996203, -79.996265, -79.996328, -79.99639, -79.996452, -79.996514, -79.996576, -79.996638, -79.996701, -79.996763, -79.996825, -79.996887, -79.996949, -79.997011, -79.997073, -79.997135, -79.997197, -79.997259, -79.99732, -79.997382, -79.997444, -79.997506, -79.997568, -79.99763, -79.997692, -79.997754, -79.997816, -79.997878, -79.99794, -79.998002, -79.998064, -79.998126, -79.998187, -79.998249, -79.998311, -79.998373, -79.998435, -79.998497, -79.998559, -79.998621, -79.998683, -79.998745, -79.998807, -79.998869, -79.998931, -79.998993, -79.999055, -79.999117, -79.999179, -79.99924, -79.999302, -79.999364, -79.999426, -79.999488, -79.999551, -79.999613, -79.999675, -79.999738, -79.999801, -79.999864, -79.999928, -79.999991, -80.000054, -80.000118, -80.000182, -80.000246, -80.00031, -80.000374, -80.000438, -80.000502, -80.000566, -80.00063, -80.000694, -80.000758, -80.000822, -80.000885, -80.000949, -80.001012, -80.001076, -80.001139, -80.001203, -80.001266, -80.001329, -80.001392, -80.001455, -80.001517, -80.00158, -80.001642, -80.001704, -80.001765, -80.001826, -80.001887, -80.001948, -80.002009, -80.002069, -80.00213, -80.002191, -80.002251, -80.002312, -80.002373, -80.002434, -80.002495, -80.002556, -80.002618, -80.00268, -80.002742, -80.002805, -80.002867, -80.00293, -80.002994, -80.003057, -80.00312, -80.003184, -80.003248, -80.003312, -80.003376, -80.003439, -80.003503, -80.003566, -80.00363, -80.003693, -80.003756, -80.003819, -80.003882, -80.003945, -80.004007, -80.00407, -80.004133, -80.004195, -80.004257, -80.004318, -80.00438, -80.004441, -80.004503, -80.004564, -80.004625, -80.004686, -80.004746, -80.004807, -80.004868, -80.004928, -80.004989, -80.00505, -80.005111, -80.005172, -80.005233, -80.005294, -80.005356, -80.005417, -80.005478, -80.00554, -80.005601, -80.005663, -80.005725, -80.005787, -80.005849, -80.00591, -80.005972, -80.006034, -80.006096, -80.006158, -80.00622, -80.006283, -80.006345, -80.006407, -80.006469, -80.006531, -80.006594, -80.006656, -80.006719, -80.006781, -80.006844, -80.006906, -80.006969, -80.007031, -80.007094, -80.007156, -80.007219, -80.007282, -80.007345, -80.007407, -80.00747, -80.007533, -80.007596, -80.007659, -80.007722, -80.007785, -80.007848, -80.007911, -80.007974, -80.008037, -80.0081, -80.008164, -80.008227, -80.00829, -80.008353, -80.008416, -80.008479, -80.008543, -80.008606, -80.008669, -80.008732, -80.008795, -80.008858, -80.008921, -80.008984, -80.009047, -80.00911, -80.009173, -80.009235, -80.009298, -80.009361, -80.009424, -80.009487, -80.009549, -80.009612, -80.009675, -80.009737, -80.0098, -80.009862, -80.009924, -80.009987, -80.010049, -80.010111, -80.010174, -80.010236, -80.010298, -80.010361, -80.010423, -80.010485, -80.010547, -80.01061, -80.010672, -80.010735, -80.010797, -80.010859, -80.010922, -80.010984, -80.011047, -80.011109, -80.011172, -80.011234, -80.011296, -80.011359, -80.011421, -80.011484, -80.011546, -80.011608, -80.01167, -80.011732, -80.011795, -80.011857, -80.011919, -80.011981, -80.012043, -80.012105, -80.012167, -80.01223, -80.012292, -80.012354, -80.012416, -80.012479, -80.012541, -80.012603, -80.012665, -80.012728, -80.01279, -80.012853, -80.012915, -80.012978, -80.01304, -80.013103, -80.013165, -80.013228, -80.013291, -80.013353, -80.013416, -80.013479, -80.013542, -80.013604, -80.013667, -80.01373, -80.013793, -80.013856, -80.013919, -80.013982, -80.014044, -80.014107, -80.01417, -80.014233, -80.014295, -80.014358, -80.014421, -80.014483, -80.014546, -80.014609, -80.014671, -80.014734, -80.014796, -80.014859, -80.014921, -80.014983, -80.015046, -80.015109, -80.015171, -80.015234, -80.015297, -80.015359, -80.015422, -80.015485, -80.015547, -80.01561, -80.015673, -80.015736, -80.015799, -80.015862, -80.015925, -80.015987, -80.01605, -80.016113, -80.016176, -80.016239, -80.016301, -80.016364, -80.016427, -80.01649, -80.016552, -80.016615, -80.016678, -80.01674, -80.016803, -80.016866, -80.016928, -80.016991, -80.017054, -80.017116, -80.017179, -80.017242, -80.017304, -80.017367, -80.01743, -80.017492, -80.017555, -80.017618, -80.01768, -80.017743, -80.017806, -80.017868, -80.017931, -80.017994, -80.018056, -80.018119, -80.018181, -80.018244, -80.018307, -80.018369, -80.018432, -80.018494, -80.018557, -80.018619, -80.018682, -80.018744, -80.018806, -80.018869, -80.018931, -80.018994, -80.019056, -80.019118, -80.01918, -80.019243, -80.019305, -80.019367, -80.01943, -80.019492, -80.019554, -80.019616, -80.019679, -80.019741, -80.019803, -80.019866, -80.019928, -80.01999, -80.020052, -80.020115, -80.020177, -80.020239, -80.020302, -80.020364, -80.020426, -80.020488, -80.020551, -80.020613, -80.020675, -80.020737, -80.020799, -80.020862, -80.020924, -80.020986, -80.021048, -80.021111, -80.021173, -80.021235, -80.021298, -80.02136, -80.021422, -80.021485, -80.021547, -80.02161, -80.021673, -80.021735, -80.021798, -80.021861, -80.021923, -80.021986, -80.022049, -80.022111, -80.022174, -80.022237, -80.022299, -80.022362, -80.022425, -80.022487, -80.02255, -80.022612, -80.022675, -80.022738, -80.0228, -80.022863, -80.022925, -80.022988, -80.02305, -80.023113, -80.023175, -80.023238, -80.0233, -80.023363, -80.023425, -80.023488, -80.02355, -80.023613, -80.023675, -80.023738, -80.0238, -80.023862, -80.023925, -80.023987, -80.024049, -80.024112, -80.024174, -80.024236, -80.024298, -80.02436, -80.024422, -80.024484, -80.024546, -80.024608, -80.02467, -80.024732, -80.024794, -80.024856, -80.024918, -80.02498, -80.025042, -80.025104, -80.025166, -80.025228, -80.02529, -80.025353, -80.025415, -80.025477, -80.025539, -80.025601, -80.025664, -80.025726, -80.025788, -80.02585, -80.025913, -80.025975, -80.026037, -80.0261, -80.026162, -80.026225, -80.026288, -80.02635, -80.026413, -80.026476, -80.026538, -80.026601, -80.026664, -80.026727, -80.02679, -80.026853, -80.026916, -80.026978, -80.027041, -80.027104, -80.027167, -80.02723, -80.027293, -80.027356, -80.027419, -80.027482, -80.027545, -80.027607, -80.02767, -80.027733, -80.027796, -80.027859, -80.027922, -80.027985, -80.028048, -80.028111, -80.028174, -80.028237, -80.0283, -80.028363, -80.028426, -80.02849, -80.028553, -80.028616, -80.028679, -80.028742, -80.028805, -80.028868, -80.028931, -80.028995, -80.029058, -80.029121, -80.029184, -80.029247, -80.029311, -80.029374, -80.029437, -80.0295, -80.029563, -80.029626, -80.02969, -80.029753, -80.029816, -80.029879, -80.029942, -80.030005, -80.030068, -80.030131, -80.030194, -80.030257, -80.03032, -80.030384, -80.030447, -80.03051, -80.030573, -80.030636, -80.030699, -80.030763, -80.030826, -80.030889, -80.030953, -80.031016, -80.031079, -80.031142, -80.031206, -80.031269, -80.031332, -80.031395, -80.031458, -80.031522, -80.031585, -80.031648, -80.031711, -80.031774, -80.031837, -80.031899, -80.031962, -80.032025, -80.032088, -80.03215, -80.032213, -80.032276, -80.032338, -80.032401, -80.032463, -80.032526, -80.032588, -80.032651, -80.032713, -80.032776, -80.032838, -80.032901, -80.032963, -80.033026, -80.033088, -80.03315, -80.033213, -80.033275, -80.033338, -80.0334, -80.033463, -80.033525, -80.033588, -80.03365, -80.033713, -80.033775, -80.033837, -80.0339, -80.033962, -80.034025, -80.034087, -80.03415, -80.034212, -80.034274, -80.034336, -80.034399, -80.034461, -80.034523, -80.034586, -80.034648, -80.03471, -80.034772, -80.034834, -80.034896, -80.034958, -80.03502, -80.035082, -80.035144, -80.035205, -80.035267, -80.035329, -80.035391, -80.035452, -80.035511, -80.035571, -80.035632, -80.035693, -80.035756, -80.035819, -80.035882, -80.035946, -80.03601, -80.036075, -80.036141, -80.036206, -80.036272, -80.036338, -80.036404, -80.03647, -80.036536, -80.036602, -80.036668, -80.036734, -80.036799, -80.036864, -80.036928, -80.036992, -80.037056, -80.037118, -80.037181, -80.037242, -80.037302, -80.037362, -80.037421, -80.037482, -80.037543, -80.037604, -80.037665, -80.037727, -80.037787, -80.037849, -80.03791, -80.037971, -80.038032, -80.038093, -80.038154, -80.038215, -80.038277, -80.038338, -80.038399, -80.03846, -80.038522, -80.038583, -80.038644, -80.038705, -80.038767, -80.038828, -80.038889, -80.03895, -80.039011, -80.039072, -80.039134, -80.039195, -80.039256, -80.039317, -80.039378, -80.039439, -80.039501, -80.039562, -80.039623, -80.039684, -80.039745, -80.039806, -80.039867, -80.039928, -80.039989, -80.04005, -80.040112, -80.040173, -80.040234, -80.040295, -80.040356, -80.040418, -80.040479, -80.04054, -80.040602, -80.040663, -80.040724, -80.040786, -80.040848, -80.040909, -80.040971, -80.041033, -80.041094, -80.041156, -80.041218, -80.041279, -80.041341, -80.041403, -80.041465, -80.041526, -80.041588, -80.04165, -80.041712, -80.041774, -80.041836, -80.041898, -80.04196, -80.042022, -80.042084, -80.042146, -80.042208, -80.04227, -80.042332, -80.042394, -80.042456, -80.042518, -80.04258, -80.042642, -80.042704, -80.042766, -80.042828, -80.04289, -80.042952, -80.043014, -80.043076, -80.043138, -80.0432, -80.043261, -80.043323, -80.043385, -80.043447, -80.043509, -80.043571, -80.043633, -80.043695, -80.043757, -80.043819, -80.043881, -80.043943, -80.044005, -80.044067, -80.044129, -80.044191, -80.044253, -80.044315, -80.044377, -80.044439, -80.044501, -80.044563, -80.044625, -80.044686, -80.044748, -80.04481, -80.044872, -80.044934, -80.044996, -80.045057, -80.045119, -80.045181, -80.045243, -80.045304, -80.045366, -80.045428, -80.04549, -80.045552, -80.045613, -80.045675, -80.045737, -80.045799, -80.045861, -80.045923, -80.045985, -80.046046, -80.046108, -80.04617, -80.046232, -80.046293, -80.046355, -80.046416, -80.046478, -80.04654, -80.046601, -80.046663, -80.046724, -80.046786, -80.046848, -80.046909, -80.046971, -80.047032, -80.047094, -80.047155, -80.047217, -80.047279, -80.047341, -80.047402, -80.047464, -80.047526, -80.047588, -80.04765, -80.047711, -80.047773, -80.047835, -80.047897, -80.047959, -80.048021, -80.048083, -80.048145, -80.048206, -80.048268, -80.048331, -80.048393, -80.048455, -80.048517, -80.048579, -80.048641, -80.048703, -80.048766, -80.048828, -80.04889, -80.048953, -80.049015, -80.049078, -80.04914, -80.049203, -80.049265, -80.049328, -80.04939, -80.049453, -80.049515, -80.049578, -80.04964, -80.049703, -80.049765, -80.049828, -80.04989, -80.049952, -80.050015, -80.050077, -80.050139, -80.050201, -80.050264, -80.050326, -80.050388, -80.05045, -80.050512, -80.050574, -80.050637, -80.050699, -80.050761, -80.050823, -80.050885, -80.050948, -80.05101, -80.051073, -80.051135, -80.051197, -80.05126, -80.051323, -80.051385, -80.051448, -80.051511, -80.051573, -80.051636, -80.051699, -80.051762, -80.051825, -80.051887, -80.05195, -80.052013, -80.052076, -80.052139, -80.052202, -80.052265, -80.052327, -80.05239, -80.052453, -80.052516, -80.052579, -80.052642, -80.052705, -80.052768, -80.052831, -80.052893, -80.052956, -80.05302, -80.053083, -80.053147, -80.05321, -80.053274, -80.053338, -80.053402, -80.053466, -80.05353, -80.053594, -80.053658, -80.053723, -80.053787, -80.053851, -80.053915, -80.053979, -80.054043, -80.054107, -80.05417, -80.054233, -80.054296, -80.054359, -80.054422, -80.054484, -80.054546, -80.054608, -80.05467, -80.054732, -80.054794, -80.054857, -80.054919, -80.054981, -80.055043, -80.055105, -80.055167, -80.055229, -80.055292, -80.055354, -80.055416, -80.055479, -80.055541, -80.055603, -80.055665, -80.055728, -80.05579, -80.055852, -80.055915, -80.055977, -80.056039, -80.056102, -80.056164, -80.056227, -80.056289, -80.056352, -80.056415, -80.056478, -80.05654, -80.056603, -80.056666, -80.056728, -80.056791, -80.056854, -80.056917, -80.05698, -80.057043, -80.057106, -80.057169, -80.057232, -80.057295, -80.057358, -80.05742, -80.057483, -80.057547, -80.05761, -80.057673, -80.057736, -80.057799, -80.057862, -80.057925, -80.057988, -80.058051, -80.058113, -80.058176, -80.058239, -80.058302, -80.058365, -80.058428, -80.05849, -80.058553, -80.058616, -80.058679, -80.058742, -80.058805, -80.058867, -80.05893, -80.058993, -80.059056, -80.059119, -80.059182, -80.059245, -80.059308, -80.059371, -80.059434, -80.059497, -80.05956, -80.059623, -80.059685, -80.059748, -80.059811, -80.059874, -80.059937, -80.06, -80.060063, -80.060126, -80.060188, -80.060251, -80.060314, -80.060377, -80.06044, -80.060503, -80.060565, -80.060628, -80.060691, -80.060754, -80.060818, -80.06088, -80.060944, -80.061007, -80.06107, -80.061134, -80.061197, -80.061261, -80.061324, -80.061388, -80.061451, -80.061515, -80.061579, -80.061642, -80.061706, -80.06177, -80.061833, -80.061897, -80.06196, -80.062024, -80.062087, -80.062151, -80.062214, -80.062277, -80.062341, -80.062404, -80.062467, -80.062531, -80.062594, -80.062657, -80.062721, -80.062784, -80.062847, -80.062911, -80.062974, -80.063038, -80.063101, -80.063165, -80.063228, -80.063291, -80.063354, -80.063418, -80.063481, -80.063545, -80.063608, -80.063672, -80.063735, -80.063799, -80.063862, -80.063925, -80.063989, -80.064052, -80.064115, -80.064178, -80.064242, -80.064305, -80.064368, -80.06443, -80.064493, -80.064556, -80.064619, -80.064681, -80.064744, -80.064807, -80.064869, -80.064931, -80.064993, -80.065055, -80.065115, -80.065177, -80.06524, -80.065304, -80.065367, -80.06543, -80.065492, -80.065555, -80.065618, -80.065681, -80.065743, -80.065806, -80.065868, -80.065931, -80.065994, -80.066056, -80.066119, -80.066181, -80.066244, -80.066306, -80.066369, -80.066431, -80.066491, -80.066555, -80.066618, -80.066682, -80.066745, -80.066808, -80.066871, -80.066934, -80.066997, -80.067064, -80.067127, -80.067191, -80.067254, -80.067317, -80.06738, -80.067443, -80.067505, -80.067567, -80.067629, -80.067691, -80.067753, -80.067815, -80.067876, -80.067938, -80.067999, -80.06806, -80.068121, -80.068182, -80.06824, -80.068302, -80.068364, -80.068429, -80.068492, -80.068555, -80.068617, -80.06868, -80.068742, -80.068805, -80.068867, -80.06893, -80.068991, -80.069053, -80.069115, -80.069177, -80.069238, -80.0693, -80.069361, -80.069422, -80.069483, -80.069544, -80.069605, -80.069665, -80.069726, -80.069786, -80.069847, -80.069907, -80.069967, -80.070028, -80.070088, -80.070151, -80.070212, -80.070274, -80.070335, -80.070396, -80.070458, -80.070519, -80.070581, -80.070642, -80.070704, -80.070765, -80.070827, -80.070888, -80.07095, -80.071011, -80.071073, -80.071134, -80.071196, -80.071258, -80.071319, -80.071381, -80.071442, -80.071504, -80.071565, -80.071626, -80.071687, -80.071749, -80.07181, -80.071871, -80.071932, -80.071993, -80.072055, -80.072116, -80.072178, -80.07224, -80.072301, -80.072363, -80.072425, -80.072487, -80.072549, -80.072612, -80.072674, -80.072736, -80.072799, -80.072861, -80.072924, -80.072986, -80.073049, -80.073111, -80.073173, -80.073236, -80.073298, -80.07336, -80.073422, -80.073484, -80.073546, -80.073607, -80.073669, -80.073731, -80.073792, -80.073854, -80.073916, -80.073977, -80.074039, -80.074101, -80.074162, -80.074224, -80.074285, -80.074347, -80.074408, -80.07447, -80.074532, -80.074593, -80.074655, -80.074716, -80.074778, -80.074839, -80.0749, -80.074962, -80.075023, -80.075084, -80.075146, -80.075207, -80.075268, -80.075329, -80.07539, -80.075452, -80.075513, -80.075574, -80.075635, -80.075696, -80.075757, -80.075819, -80.07588, -80.075941, -80.076002, -80.076063, -80.076124, -80.076185, -80.076246, -80.076307, -80.076368, -80.076429, -80.07649, -80.076551, -80.076612, -80.076674, -80.076735, -80.076796, -80.076858, -80.076919, -80.076981, -80.077042, -80.077104, -80.077165, -80.077227, -80.077288, -80.07735, -80.077412, -80.077473, -80.077535, -80.077596, -80.077657, -80.077719, -80.07778, -80.077841, -80.077902, -80.077964, -80.078025, -80.078086, -80.078147, -80.078208, -80.07827, -80.078331, -80.078392, -80.078453, -80.078514, -80.078575, -80.078636, -80.078697, -80.078758, -80.078819, -80.07888, -80.078941, -80.079002, -80.079062, -80.079123, -80.079184, -80.079244, -80.079305, -80.079366, -80.079426, -80.079487, -80.079548, -80.079608, -80.079669, -80.079729, -80.07979, -80.07985, -80.079911],
+            power: [11900, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 12100, 12100, 12100, 12100, 12100, 12100, 12100, 12100, 12100, 12100, 12200, 12200, 12200, 12200, 12200, 12200, 12200, 12200, 12200, 12200, 12200, 12200, 12200, 12200, 12200, 12200, 12200, 12200, 12200, 12200, 12100, 12100, 12100, 12100, 12100, 12100, 12100, 12100, 12100, 12100, 12100, 12100, 12100, 12100, 12100, 12100, 12100, 12100, 12100, 12100, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11500, 11500, 11500, 11500, 11500, 11500, 11500, 11500, 11500, 11500, 11500, 11500, 11500, 11500, 11500, 11500, 11500, 11500, 11500, 11500, 11500, 11500, 11500, 11500, 11500, 11500, 11500, 11500, 11500, 11500, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11500, 11500, 11500, 11500, 11500, 11500, 11500, 11500, 11500, 11500, 11500, 11500, 11500, 11500, 11500, 11500, 11500, 11500, 11500, 11500, 11500, 11500, 11500, 11500, 11500, 11500, 11500, 11500, 11500, 11500, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11600, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11700, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11800, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900, 11900],
+            rpm: [65.2, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.1, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2, 65.2],
+            speed: [16.94, 15.0, 15.0, 15.0, 15.0, 15.0, 15.0, 15.0, 15.0, 15.0, 15.0, 15.0, 15.0, 15.0, 15.0, 15.0, 15.0, 15.0, 16.83, 16.83, 16.83, 16.83, 16.83, 16.83, 16.83, 16.83, 16.83, 16.83, 16.87, 16.87, 16.87, 16.87, 16.87, 16.87, 16.87, 16.87, 16.87, 16.87, 16.85, 16.85, 16.85, 16.85, 16.85, 16.85, 16.85, 16.85, 16.85, 16.85, 16.86, 16.86, 16.86, 16.86, 16.86, 16.86, 16.86, 16.86, 16.86, 16.86, 16.85, 16.85, 16.85, 16.85, 16.85, 16.85, 16.85, 16.85, 16.85, 16.85, 16.85, 16.85, 16.85, 16.85, 16.85, 16.85, 16.85, 16.85, 16.85, 16.85, 16.84, 16.84, 16.84, 16.84, 16.84, 16.84, 16.84, 16.84, 16.84, 16.84, 16.91, 16.91, 16.91, 16.91, 16.91, 16.91, 16.91, 16.91, 16.91, 16.91, 16.96, 16.96, 16.96, 16.96, 16.96, 16.96, 16.96, 16.96, 16.96, 16.96, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.92, 16.92, 16.92, 16.92, 16.92, 16.92, 16.92, 16.92, 16.92, 16.92, 16.91, 16.91, 16.91, 16.91, 16.91, 16.91, 16.91, 16.91, 16.91, 16.91, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.88, 16.88, 16.88, 16.88, 16.88, 16.88, 16.88, 16.88, 16.88, 16.88, 16.9, 16.9, 16.9, 16.9, 16.9, 16.9, 16.9, 16.9, 16.9, 16.9, 16.87, 16.87, 16.87, 16.87, 16.87, 16.87, 16.87, 16.87, 16.87, 16.87, 16.89, 16.89, 16.89, 16.89, 16.89, 16.89, 16.89, 16.89, 16.89, 16.89, 16.97, 16.97, 16.97, 16.97, 16.97, 16.97, 16.97, 16.97, 16.97, 16.97, 17.0, 17.0, 17.0, 17.0, 17.0, 17.0, 17.0, 17.0, 17.0, 17.0, 17.01, 17.01, 17.01, 17.01, 17.01, 17.01, 17.01, 17.01, 17.01, 17.01, 17.02, 17.02, 17.02, 17.02, 17.02, 17.02, 17.02, 17.02, 17.02, 17.02, 17.03, 17.03, 17.03, 17.03, 17.03, 17.03, 17.03, 17.03, 17.03, 17.03, 17.01, 17.01, 17.01, 17.01, 17.01, 17.01, 17.01, 17.01, 17.01, 17.01, 16.96, 16.96, 16.96, 16.96, 16.96, 16.96, 16.96, 16.96, 16.96, 16.96, 16.98, 16.98, 16.98, 16.98, 16.98, 16.98, 16.98, 16.98, 16.98, 16.98, 16.97, 16.97, 16.97, 16.97, 16.97, 16.97, 16.97, 16.97, 16.97, 16.97, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.92, 16.92, 16.92, 16.92, 16.92, 16.92, 16.92, 16.92, 16.92, 16.92, 16.95, 16.95, 16.95, 16.95, 16.95, 16.95, 16.95, 16.95, 16.95, 16.95, 16.95, 16.95, 16.95, 16.95, 16.95, 16.95, 16.95, 16.95, 16.95, 16.95, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.95, 16.95, 16.95, 16.95, 16.95, 16.95, 16.95, 16.95, 16.95, 16.95, 16.96, 16.96, 16.96, 16.96, 16.96, 16.96, 16.96, 16.96, 16.96, 16.96, 16.95, 16.95, 16.95, 16.95, 16.95, 16.95, 16.95, 16.95, 16.95, 16.95, 16.95, 16.95, 16.95, 16.95, 16.95, 16.95, 16.95, 16.95, 16.95, 16.95, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.95, 16.95, 16.95, 16.95, 16.95, 16.95, 16.95, 16.95, 16.95, 16.95, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.95, 16.95, 16.95, 16.95, 16.95, 16.95, 16.95, 16.95, 16.95, 16.95, 16.98, 16.98, 16.98, 16.98, 16.98, 16.98, 16.98, 16.98, 16.98, 16.98, 16.97, 16.97, 16.97, 16.97, 16.97, 16.97, 16.97, 16.97, 16.97, 16.97, 16.96, 16.96, 16.96, 16.96, 16.96, 16.96, 16.96, 16.96, 16.96, 16.96, 16.96, 16.96, 16.96, 16.96, 16.96, 16.96, 16.96, 16.96, 16.96, 16.96, 16.97, 16.97, 16.97, 16.97, 16.97, 16.97, 16.97, 16.97, 16.97, 16.97, 17.0, 17.0, 17.0, 17.0, 17.0, 17.0, 17.0, 17.0, 17.0, 17.0, 17.03, 17.03, 17.03, 17.03, 17.03, 17.03, 17.03, 17.03, 17.03, 17.03, 17.0, 17.0, 17.0, 17.0, 17.0, 17.0, 17.0, 17.0, 17.0, 17.0, 16.95, 16.95, 16.95, 16.95, 16.95, 16.95, 16.95, 16.95, 16.95, 16.95, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.96, 16.96, 16.96, 16.96, 16.96, 16.96, 16.96, 16.96, 16.96, 16.96, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.89, 16.89, 16.89, 16.89, 16.89, 16.89, 16.89, 16.89, 16.89, 16.89, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.98, 16.98, 16.98, 16.98, 16.98, 16.98, 16.98, 16.98, 16.98, 16.98, 16.96, 16.96, 16.96, 16.96, 16.96, 16.96, 16.96, 16.96, 16.96, 16.96, 16.95, 16.95, 16.95, 16.95, 16.95, 16.95, 16.95, 16.95, 16.95, 16.95, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 17.0, 17.0, 17.0, 17.0, 17.0, 17.0, 17.0, 17.0, 17.0, 17.0, 17.02, 17.02, 17.02, 17.02, 17.02, 17.02, 17.02, 17.02, 17.02, 17.02, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.88, 16.88, 16.88, 16.88, 16.88, 16.88, 16.88, 16.88, 16.88, 16.88, 16.91, 16.91, 16.91, 16.91, 16.91, 16.91, 16.91, 16.91, 16.91, 16.91, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.92, 16.92, 16.92, 16.92, 16.92, 16.92, 16.92, 16.92, 16.92, 16.92, 16.88, 16.88, 16.88, 16.88, 16.88, 16.88, 16.88, 16.88, 16.88, 16.88, 16.91, 16.91, 16.91, 16.91, 16.91, 16.91, 16.91, 16.91, 16.91, 16.91, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.95, 16.95, 16.95, 16.95, 16.95, 16.95, 16.95, 16.95, 16.95, 16.95, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.98, 16.98, 16.98, 16.98, 16.98, 16.98, 16.98, 16.98, 16.98, 16.98, 16.95, 16.95, 16.95, 16.95, 16.95, 16.95, 16.95, 16.95, 16.95, 16.95, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.98, 16.98, 16.98, 16.98, 16.98, 16.98, 16.98, 16.98, 16.98, 16.98, 16.99, 16.99, 16.99, 16.99, 16.99, 16.99, 16.99, 16.99, 16.99, 16.99, 16.96, 16.96, 16.96, 16.96, 16.96, 16.96, 16.96, 16.96, 16.96, 16.96, 16.96, 16.96, 16.96, 16.96, 16.96, 16.96, 16.96, 16.96, 16.96, 16.96, 16.97, 16.97, 16.97, 16.97, 16.97, 16.97, 16.97, 16.97, 16.97, 16.97, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.97, 16.97, 16.97, 16.97, 16.97, 16.97, 16.97, 16.97, 16.97, 16.97, 17.0, 17.0, 17.0, 17.0, 17.0, 17.0, 17.0, 17.0, 17.0, 17.0, 16.99, 16.99, 16.99, 16.99, 16.99, 16.99, 16.99, 16.99, 16.99, 16.99, 16.97, 16.97, 16.97, 16.97, 16.97, 16.97, 16.97, 16.97, 16.97, 16.97, 16.95, 16.95, 16.95, 16.95, 16.95, 16.95, 16.95, 16.95, 16.95, 16.95, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.92, 16.92, 16.92, 16.92, 16.92, 16.92, 16.92, 16.92, 16.92, 16.92, 16.92, 16.92, 16.92, 16.92, 16.92, 16.92, 16.92, 16.92, 16.92, 16.92, 16.92, 16.92, 16.92, 16.92, 16.92, 16.92, 16.92, 16.92, 16.92, 16.92, 16.92, 16.92, 16.92, 16.92, 16.92, 16.92, 16.92, 16.92, 16.92, 16.92, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.97, 16.97, 16.97, 16.97, 16.97, 16.97, 16.97, 16.97, 16.97, 16.97, 17.0, 17.0, 17.0, 17.0, 17.0, 17.0, 17.0, 17.0, 17.0, 17.0, 16.98, 16.98, 16.98, 16.98, 16.98, 16.98, 16.98, 16.98, 16.98, 16.98, 17.0, 17.0, 17.0, 17.0, 17.0, 17.0, 17.0, 17.0, 17.0, 17.0, 17.04, 17.04, 17.04, 17.04, 17.04, 17.04, 17.04, 17.04, 17.04, 17.04, 17.01, 17.01, 17.01, 17.01, 17.01, 17.01, 17.01, 17.01, 17.01, 17.01, 16.97, 16.97, 16.97, 16.97, 16.97, 16.97, 16.97, 16.97, 16.97, 16.97, 16.98, 16.98, 16.98, 16.98, 16.98, 16.98, 16.98, 16.98, 16.98, 16.98, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.95, 16.95, 16.95, 16.95, 16.95, 16.95, 16.95, 16.95, 16.95, 16.95, 16.95, 16.95, 16.95, 16.95, 16.95, 16.95, 16.95, 16.95, 16.95, 16.95, 16.96, 16.96, 16.96, 16.96, 16.96, 16.96, 16.96, 16.96, 16.97, 16.97, 16.97, 16.97, 16.97, 16.97, 16.97, 16.97, 16.97, 16.97, 16.96, 16.96, 16.96, 16.96, 16.96, 16.96, 16.96, 16.96, 16.96, 16.96, 16.96, 16.96, 16.96, 16.96, 16.96, 16.96, 16.96, 16.96, 16.96, 16.96, 16.97, 16.97, 16.97, 16.97, 16.97, 16.97, 16.97, 16.97, 16.97, 16.97, 16.99, 16.99, 16.99, 16.99, 16.99, 16.99, 16.99, 16.99, 16.99, 16.99, 16.97, 16.97, 16.97, 16.97, 16.97, 16.97, 16.97, 16.97, 16.97, 16.97, 16.92, 16.92, 16.92, 16.92, 16.92, 16.92, 16.92, 16.92, 16.92, 16.92, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.94, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.93, 16.88, 16.88, 16.88, 16.88, 16.88, 16.88, 16.88, 16.88, 16.88, 16.88, 16.88, 16.88, 16.88, 16.88, 16.88, 16.88, 16.88, 16.88, 16.88, 16.88, 16.86, 16.86, 16.86, 16.86, 16.86, 16.86, 16.86, 16.86, 16.86, 16.86, 16.83, 16.83, 16.83, 16.83, 16.83, 16.83, 16.83, 16.83, 16.83, 16.83, 16.76, 16.76, 16.76, 16.76, 16.76, 16.76, 16.76, 16.76, 16.76, 16.76, 16.71, 16.71, 16.71, 16.71, 16.71, 16.71, 16.71, 16.71, 16.71, 16.71, 16.74, 16.74, 16.74, 16.74, 16.74, 16.74, 16.74, 16.74, 16.74, 16.74, 16.74, 16.74, 16.74, 16.74, 16.74, 16.74, 16.74, 16.74, 16.74, 16.74, 16.75, 16.75, 16.75, 16.75, 16.75, 16.75, 16.75, 16.75, 16.75, 16.75, 16.77, 16.77, 16.77, 16.77, 16.77, 16.77, 16.77, 16.77, 16.77, 16.77, 16.76, 16.76, 16.76, 16.76, 16.76, 16.76, 16.76, 16.76, 16.76, 16.76, 16.74, 16.74, 16.74, 16.74, 16.74, 16.74, 16.74, 16.74, 16.74, 16.74, 16.71, 16.71, 16.71, 16.71, 16.71, 16.71, 16.71, 16.71, 16.71, 16.71, 16.69, 16.69, 16.69, 16.69, 16.69, 16.69, 16.69, 16.69, 16.69, 16.69, 16.69, 16.69, 16.69, 16.69, 16.69, 16.69, 16.69, 16.69, 16.69, 16.69, 16.71, 16.71, 16.71, 16.71, 16.71, 16.71, 16.71, 16.71, 16.71, 16.71, 16.7, 16.7, 16.7, 16.7, 16.7, 16.7, 16.7, 16.7, 16.7, 16.7, 16.72, 16.72, 16.72, 16.72, 16.72, 16.72, 16.72, 16.72, 16.72, 16.72, 16.73, 16.73, 16.73, 16.73, 16.73, 16.73, 16.73, 16.73, 16.73, 16.73, 16.73, 16.73, 16.73, 16.73, 16.73, 16.73, 16.73, 16.73, 16.73, 16.73, 16.75, 16.75, 16.75, 16.75, 16.75, 16.75, 16.75, 16.75, 16.75, 16.75, 16.78, 16.78, 16.78, 16.78, 16.78, 16.78, 16.78, 16.78, 16.78, 16.78, 16.75, 16.75, 16.75, 16.75, 16.75, 16.75, 16.75, 16.75, 16.75, 16.75, 16.71, 16.71, 16.71, 16.71, 16.71, 16.71, 16.71, 16.71, 16.71, 16.71, 16.71, 16.71, 16.71, 16.71, 16.71, 16.71, 16.71, 16.71, 16.71, 16.71, 16.69, 16.69, 16.69, 16.69, 16.69, 16.69, 16.69, 16.69, 16.69, 16.69, 16.7, 16.7, 16.7, 16.7, 16.7, 16.7, 16.7, 16.7, 16.7, 16.7, 16.7, 16.7, 16.7, 16.7, 16.7, 16.7, 16.7, 16.7, 16.7, 16.7, 16.7, 16.7, 16.7, 16.7, 16.7, 16.7, 16.7, 16.7, 16.7, 16.7, 16.7, 16.7, 16.7, 16.7, 16.7, 16.7, 16.7, 16.7, 16.7, 16.7, 16.7, 16.7, 16.7, 16.7, 16.7, 16.7, 16.7, 16.7, 16.7, 16.7, 16.69, 16.69, 16.69, 16.69, 16.69, 16.69, 16.69, 16.69, 16.69, 16.69, 16.7, 16.7, 16.7, 16.7, 16.7, 16.7, 16.7, 16.7, 16.7, 16.7, 16.72, 16.72, 16.72, 16.72, 16.72, 16.72, 16.72, 16.72, 16.72, 16.72, 16.73, 16.73, 16.73, 16.73, 16.73, 16.73, 16.73, 16.73, 16.73, 16.73, 16.75, 16.75, 16.75, 16.75, 16.75, 16.75, 16.75, 16.75, 16.75, 16.75, 16.75, 16.75, 16.75, 16.75, 16.75, 16.75, 16.75, 16.75, 16.75, 16.75, 16.74, 16.74, 16.74, 16.74, 16.74, 16.74, 16.74, 16.74, 16.74, 16.74, 16.75, 16.75, 16.75, 16.75, 16.75, 16.75, 16.75, 16.75, 16.75, 16.75, 16.74, 16.74, 16.74, 16.74, 16.74, 16.74, 16.74, 16.74, 16.74, 16.74, 16.73, 16.73, 16.73, 16.73, 16.73, 16.73, 16.73, 16.73, 16.73, 16.73, 16.73, 16.73, 16.73, 16.73, 16.73, 16.73, 16.73, 16.73, 16.73, 16.73, 16.72, 16.72, 16.72, 16.72, 16.72, 16.72, 16.72, 16.72, 16.72, 16.72, 16.71, 16.71, 16.71, 16.71, 16.71, 16.71, 16.71, 16.71, 16.71, 16.71, 16.7, 16.7, 16.7, 16.7, 16.7, 16.7, 16.7, 16.7, 16.7, 16.7, 16.69, 16.69, 16.69, 16.69, 16.69, 16.69, 16.69, 16.69, 16.69, 16.69, 16.72, 16.72, 16.72, 16.72, 16.72, 16.72, 16.72, 16.72, 16.72, 16.72, 16.71, 16.71, 16.71, 16.71, 16.71, 16.71, 16.71, 16.71, 16.71, 16.71, 16.7, 16.7, 16.7, 16.7, 16.7, 16.7, 16.7, 16.7, 16.7, 16.7, 16.71, 16.71, 16.71, 16.71, 16.71, 16.71, 16.71, 16.71, 16.71, 16.71, 16.69, 16.69, 16.69, 16.69, 16.69, 16.69, 16.69, 16.69, 16.69, 16.69, 16.7, 16.7, 16.7, 16.7, 16.7, 16.7, 16.7, 16.7, 16.7, 16.7, 16.67, 16.67, 16.67, 16.67, 16.67, 16.67, 16.67, 16.67, 16.67, 16.67, 16.65, 16.65, 16.65, 16.65, 16.65, 16.65, 16.65, 16.65, 16.65, 16.65, 16.67, 16.67, 16.67, 16.67, 16.67, 16.67, 16.67, 16.67, 16.67, 16.67, 16.68, 16.68, 16.68, 16.68, 16.68, 16.68, 16.68, 16.68, 16.68, 16.68, 16.66, 16.66, 16.66, 16.66, 16.66, 16.66, 16.66, 16.66, 16.66, 16.66, 16.64, 16.64, 16.64, 16.64, 16.64, 16.64, 16.64, 16.64, 16.64, 16.64, 16.66, 16.66, 16.66, 16.66, 16.66, 16.66, 16.66, 16.66, 16.66, 16.66, 16.69, 16.69, 16.69, 16.69, 16.69, 16.69, 16.69, 16.69, 16.69, 16.69, 16.67, 16.67, 16.67],
+            heading: [233.8, 233.8, 233.8, 233.8, 233.8, 233.7, 233.7, 233.7, 233.7, 233.7, 233.7, 233.7, 233.7, 233.7, 233.7, 233.7, 233.7, 233.7, 233.7, 233.7, 233.7, 233.7, 233.7, 233.7, 233.7, 233.7, 233.7, 233.7, 233.7, 233.7, 233.7, 233.7, 233.7, 233.7, 233.7, 233.7, 233.7, 233.7, 233.7, 233.7, 233.7, 233.7, 233.7, 233.7, 233.7, 233.7, 233.7, 233.7, 233.7, 233.8, 233.8, 233.8, 233.8, 233.8, 233.8, 233.8, 233.8, 233.8, 233.8, 233.8, 233.8, 233.9, 233.9, 233.9, 233.9, 233.9, 233.9, 233.9, 234.0, 234.0, 234.0, 234.0, 234.0, 234.0, 234.0, 234.0, 234.1, 234.1, 234.1, 234.1, 234.1, 234.2, 234.2, 234.2, 234.2, 234.2, 234.3, 234.3, 234.3, 234.3, 234.3, 234.3, 234.3, 234.3, 234.3, 234.3, 234.3, 234.4, 234.4, 234.4, 234.4, 234.4, 234.4, 234.5, 234.5, 234.5, 234.5, 234.5, 234.5, 234.5, 234.5, 234.5, 234.5, 234.5, 234.5, 234.5, 234.5, 234.5, 234.6, 234.6, 234.6, 234.6, 234.6, 234.6, 234.6, 234.6, 234.6, 234.7, 234.7, 234.7, 234.7, 234.7, 234.7, 234.7, 234.7, 234.7, 234.7, 234.7, 234.7, 234.7, 234.7, 234.7, 234.7, 234.7, 234.7, 234.7, 234.7, 234.7, 234.7, 234.7, 234.7, 234.7, 234.7, 234.7, 234.7, 234.7, 234.7, 234.7, 234.7, 234.7, 234.7, 234.7, 234.7, 234.7, 234.7, 234.7, 234.7, 234.7, 234.7, 234.7, 234.7, 234.7, 234.7, 234.7, 234.7, 234.7, 234.7, 234.7, 234.7, 234.7, 234.7, 234.7, 234.7, 234.7, 234.7, 234.7, 234.7, 234.7, 234.7, 234.7, 234.7, 234.7, 234.7, 234.7, 234.7, 234.7, 234.6, 234.6, 234.6, 234.6, 234.6, 234.6, 234.5, 234.5, 234.5, 234.5, 234.5, 234.5, 234.5, 234.5, 234.5, 234.4, 234.4, 234.4, 234.3, 234.3, 234.3, 234.3, 234.2, 234.2, 234.2, 234.2, 234.2, 234.2, 234.2, 234.2, 234.1, 234.1, 234.1, 234.0, 234.0, 234.0, 234.0, 234.0, 234.0, 233.9, 233.9, 233.9, 233.8, 233.8, 233.8, 233.8, 233.8, 233.7, 233.7, 233.6, 233.6, 233.6, 233.5, 233.5, 233.5, 233.5, 233.5, 233.4, 233.4, 233.3, 233.3, 233.3, 233.3, 233.3, 233.3, 233.2, 233.2, 233.2, 233.1, 233.1, 233.1, 233.1, 233.0, 233.0, 233.0, 233.0, 233.0, 233.0, 233.0, 233.0, 233.0, 233.0, 233.0, 233.0, 233.0, 233.0, 232.9, 232.9, 232.9, 232.9, 232.9, 232.9, 232.9, 232.9, 232.9, 232.9, 232.9, 232.9, 232.9, 232.9, 232.9, 232.9, 232.9, 233.0, 233.0, 233.0, 233.0, 233.0, 233.0, 233.0, 233.0, 233.1, 233.1, 233.1, 233.1, 233.1, 233.1, 233.1, 233.1, 233.1, 233.1, 233.1, 233.2, 233.2, 233.2, 233.2, 233.2, 233.3, 233.3, 233.3, 233.3, 233.3, 233.3, 233.3, 233.3, 233.3, 233.4, 233.4, 233.4, 233.4, 233.4, 233.5, 233.5, 233.5, 233.5, 233.6, 233.6, 233.6, 233.6, 233.6, 233.6, 233.6, 233.6, 233.7, 233.7, 233.7, 233.7, 233.8, 233.8, 233.8, 233.8, 233.8, 233.9, 233.9, 234.0, 234.0, 234.0, 234.1, 234.2, 234.3, 234.3, 234.3, 234.4, 234.5, 234.5, 234.5, 234.6, 234.7, 234.8, 234.8, 234.8, 234.9, 235.0, 235.0, 235.1, 235.1, 235.2, 235.2, 235.3, 235.4, 235.4, 235.5, 235.5, 235.6, 235.6, 235.7, 235.7, 235.7, 235.8, 235.8, 235.9, 235.9, 235.9, 236.0, 236.1, 236.1, 236.2, 236.2, 236.2, 236.3, 236.3, 236.4, 236.4, 236.4, 236.5, 236.5, 236.5, 236.6, 236.6, 236.6, 236.6, 236.6, 236.6, 236.6, 236.6, 236.6, 236.6, 236.6, 236.6, 236.6, 236.6, 236.6, 236.6, 236.6, 236.6, 236.6, 236.6, 236.6, 236.6, 236.6, 236.6, 236.6, 236.6, 236.6, 236.6, 236.6, 236.6, 236.6, 236.6, 236.6, 236.6, 236.5, 236.5, 236.5, 236.5, 236.5, 236.5, 236.5, 236.5, 236.5, 236.5, 236.5, 236.5, 236.5, 236.5, 236.5, 236.5, 236.5, 236.5, 236.5, 236.5, 236.5, 236.5, 236.5, 236.6, 236.6, 236.6, 236.6, 236.6, 236.6, 236.6, 236.6, 236.6, 236.6, 236.6, 236.6, 236.7, 236.7, 236.7, 236.7, 236.7, 236.7, 236.7, 236.8, 236.8, 236.8, 236.8, 236.8, 236.8, 236.8, 236.8, 236.8, 236.8, 236.8, 236.8, 236.8, 236.8, 236.8, 236.9, 236.9, 236.9, 236.9, 236.9, 236.9, 236.9, 236.9, 237.0, 237.0, 237.0, 237.0, 237.0, 237.0, 237.0, 237.0, 237.0, 237.0, 237.0, 237.0, 237.0, 237.0, 237.0, 237.0, 237.0, 237.0, 237.0, 237.0, 237.0, 237.0, 237.0, 237.0, 237.0, 237.1, 237.1, 237.1, 237.1, 237.1, 237.1, 237.1, 237.1, 237.1, 237.1, 237.1, 237.1, 237.1, 237.1, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.1, 237.1, 237.1, 237.1, 237.1, 237.1, 237.0, 237.0, 237.0, 237.0, 237.0, 237.0, 237.0, 237.0, 237.0, 237.0, 237.0, 237.0, 237.0, 237.0, 237.0, 237.0, 237.0, 237.0, 236.9, 236.9, 236.9, 236.9, 236.9, 236.9, 236.9, 236.9, 236.9, 236.9, 236.9, 236.9, 236.9, 236.9, 236.9, 236.9, 236.9, 236.9, 236.9, 236.9, 236.9, 236.9, 236.9, 237.0, 237.0, 237.0, 237.0, 237.0, 237.0, 237.0, 237.0, 237.0, 237.0, 237.1, 237.1, 237.1, 237.1, 237.1, 237.2, 237.2, 237.2, 237.2, 237.2, 237.3, 237.3, 237.3, 237.3, 237.3, 237.3, 237.3, 237.3, 237.4, 237.4, 237.4, 237.4, 237.4, 237.4, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.4, 237.4, 237.4, 237.4, 237.4, 237.4, 237.4, 237.4, 237.4, 237.3, 237.3, 237.3, 237.3, 237.3, 237.3, 237.3, 237.3, 237.3, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.3, 237.3, 237.3, 237.3, 237.3, 237.3, 237.3, 237.4, 237.4, 237.4, 237.4, 237.4, 237.4, 237.4, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.4, 237.4, 237.4, 237.4, 237.4, 237.4, 237.4, 237.4, 237.4, 237.4, 237.4, 237.4, 237.3, 237.3, 237.3, 237.3, 237.3, 237.3, 237.3, 237.3, 237.3, 237.3, 237.3, 237.3, 237.3, 237.3, 237.3, 237.3, 237.3, 237.3, 237.3, 237.3, 237.3, 237.3, 237.3, 237.3, 237.3, 237.3, 237.3, 237.3, 237.3, 237.3, 237.3, 237.3, 237.3, 237.3, 237.3, 237.3, 237.3, 237.3, 237.3, 237.3, 237.3, 237.3, 237.3, 237.3, 237.3, 237.3, 237.3, 237.3, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.3, 237.3, 237.3, 237.3, 237.3, 237.3, 237.3, 237.3, 237.3, 237.3, 237.3, 237.4, 237.4, 237.4, 237.4, 237.4, 237.4, 237.4, 237.4, 237.4, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.6, 237.6, 237.6, 237.6, 237.6, 237.6, 237.6, 237.6, 237.6, 237.6, 237.6, 237.6, 237.6, 237.6, 237.6, 237.6, 237.7, 237.7, 237.7, 237.7, 237.7, 237.7, 237.7, 237.7, 237.7, 237.7, 237.7, 237.7, 237.7, 237.7, 237.7, 237.7, 237.7, 237.7, 237.7, 237.7, 237.7, 237.7, 237.7, 237.7, 237.7, 237.7, 237.7, 237.6, 237.6, 237.6, 237.6, 237.6, 237.6, 237.6, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.4, 237.4, 237.4, 237.4, 237.4, 237.4, 237.3, 237.3, 237.3, 237.3, 237.3, 237.3, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.1, 237.1, 237.1, 237.1, 237.1, 237.1, 237.1, 237.1, 237.0, 237.0, 237.0, 237.0, 237.0, 237.0, 237.0, 237.0, 237.0, 237.0, 237.0, 237.0, 237.0, 237.0, 237.0, 236.9, 236.9, 236.9, 236.9, 236.9, 236.9, 236.9, 236.8, 236.8, 236.8, 236.8, 236.8, 236.8, 236.8, 236.8, 236.8, 236.8, 236.8, 236.8, 236.8, 236.8, 236.7, 236.7, 236.7, 236.7, 236.7, 236.7, 236.7, 236.7, 236.7, 236.7, 236.6, 236.6, 236.6, 236.6, 236.6, 236.6, 236.6, 236.6, 236.6, 236.6, 236.6, 236.6, 236.6, 236.6, 236.6, 236.6, 236.5, 236.5, 236.5, 236.5, 236.5, 236.5, 236.5, 236.5, 236.5, 236.5, 236.5, 236.5, 236.5, 236.5, 236.5, 236.5, 236.5, 236.5, 236.5, 236.5, 236.5, 236.5, 236.5, 236.5, 236.5, 236.5, 236.5, 236.5, 236.5, 236.6, 236.6, 236.6, 236.6, 236.6, 236.6, 236.6, 236.6, 236.7, 236.7, 236.7, 236.7, 236.7, 236.7, 236.7, 236.7, 236.8, 236.8, 236.8, 236.8, 236.8, 236.8, 236.8, 236.8, 236.8, 236.8, 236.8, 236.8, 236.8, 236.8, 236.8, 236.8, 236.8, 236.8, 236.8, 236.8, 236.8, 236.8, 236.8, 236.8, 236.8, 236.8, 236.8, 236.8, 236.8, 236.8, 236.8, 236.8, 236.8, 236.8, 236.8, 236.8, 236.8, 236.8, 236.8, 236.8, 236.8, 236.8, 236.8, 236.8, 236.8, 236.8, 236.8, 236.8, 236.8, 236.8, 236.8, 236.8, 236.8, 236.8, 236.8, 236.8, 236.8, 236.8, 236.9, 236.9, 236.9, 236.9, 236.9, 236.9, 237.0, 237.0, 237.0, 237.0, 237.0, 237.0, 237.0, 237.0, 237.0, 237.0, 237.1, 237.1, 237.1, 237.1, 237.1, 237.2, 237.2, 237.2, 237.2, 237.2, 237.3, 237.3, 237.3, 237.3, 237.3, 237.3, 237.3, 237.3, 237.3, 237.3, 237.3, 237.3, 237.4, 237.4, 237.4, 237.4, 237.4, 237.4, 237.4, 237.4, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.6, 237.6, 237.6, 237.6, 237.6, 237.6, 237.6, 237.6, 237.6, 237.6, 237.7, 237.7, 237.7, 237.7, 237.7, 237.7, 237.7, 237.7, 237.7, 237.7, 237.7, 237.7, 237.7, 237.7, 237.7, 237.8, 237.8, 237.8, 237.8, 237.8, 237.8, 237.8, 237.8, 237.8, 237.8, 237.8, 237.8, 237.8, 237.9, 237.9, 237.9, 237.9, 237.9, 237.9, 237.9, 237.9, 237.9, 237.9, 237.9, 237.9, 237.9, 237.9, 237.9, 237.9, 237.9, 237.9, 237.9, 237.9, 237.9, 237.9, 237.9, 237.9, 237.9, 237.9, 237.9, 237.9, 237.9, 237.9, 237.9, 237.9, 237.9, 237.9, 237.9, 237.9, 237.9, 237.9, 237.9, 237.9, 237.9, 237.9, 237.9, 237.9, 237.9, 237.9, 237.9, 237.9, 237.9, 237.9, 237.9, 237.8, 237.8, 237.8, 237.8, 237.8, 237.8, 237.8, 237.8, 237.8, 237.8, 237.8, 237.8, 237.8, 237.8, 237.8, 237.8, 237.8, 237.8, 237.8, 237.8, 237.8, 237.8, 237.8, 237.8, 237.8, 237.8, 237.8, 237.8, 237.8, 237.8, 237.8, 237.8, 237.8, 237.8, 237.8, 237.7, 237.7, 237.7, 237.7, 237.7, 237.7, 237.7, 237.7, 237.7, 237.7, 237.7, 237.7, 237.7, 237.7, 237.7, 237.7, 237.7, 237.7, 237.7, 237.7, 237.7, 237.7, 237.7, 237.7, 237.7, 237.7, 237.7, 237.7, 237.7, 237.7, 237.7, 237.8, 237.8, 237.8, 237.8, 237.8, 237.8, 237.8, 237.8, 237.8, 237.8, 237.8, 237.8, 237.8, 237.8, 237.8, 237.8, 237.8, 237.8, 237.8, 237.8, 237.8, 237.8, 237.8, 237.8, 237.8, 237.8, 237.8, 237.8, 237.8, 237.8, 237.8, 237.8, 237.8, 237.8, 237.7, 237.7, 237.7, 237.7, 237.7, 237.7, 237.7, 237.7, 237.7, 237.7, 237.7, 237.7, 237.6, 237.6, 237.6, 237.6, 237.6, 237.6, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.5, 237.4, 237.4, 237.4, 237.4, 237.3, 237.3, 237.3, 237.3, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.2, 237.1, 237.1, 237.1, 237.1, 237.0, 237.0, 237.0, 237.0, 237.0, 237.0, 236.9, 236.9, 236.9, 236.9, 236.8, 236.8, 236.8, 236.8, 236.8, 236.8, 236.8, 236.8, 236.8, 236.7, 236.7, 236.7, 236.7, 236.7, 236.7, 236.6, 236.6, 236.6, 236.6, 236.6, 236.5, 236.5, 236.5, 236.5, 236.5, 236.5, 236.5, 236.5, 236.5, 236.5, 236.5, 236.5, 236.5, 236.5, 236.5, 236.5, 236.5, 236.5, 236.5, 236.5, 236.5, 236.4, 236.4, 236.4, 236.4, 236.4, 236.4, 236.4, 236.4, 236.4, 236.4, 236.4, 236.4, 236.3, 236.3, 236.3, 236.3, 236.3, 236.3, 236.3, 236.3, 236.3, 236.3, 236.3, 236.3, 236.3, 236.3, 236.3, 236.3, 236.3, 236.3, 236.3, 236.3, 236.3, 236.2, 236.2, 236.2, 236.2, 236.2, 236.2, 236.2, 236.2, 236.2, 236.2, 236.2, 236.1, 236.1, 236.1, 236.1, 236.1, 236.1, 236.1, 236.1, 236.1, 236.1, 236.1, 236.1, 236.1, 236.1, 236.1, 236.1, 236.1, 236.1, 236.1, 236.1, 236.1, 236.1, 236.0, 236.0, 236.0, 236.0, 236.0, 236.0, 236.0, 236.0, 236.0, 236.0, 236.0, 236.0, 236.0, 235.9, 235.9, 235.9, 235.9, 235.9, 235.9, 235.9, 235.9, 235.9, 235.9, 235.9, 235.9, 235.9, 235.9, 235.9, 235.9, 235.9, 235.9, 235.9, 235.9, 235.9, 235.9, 235.9, 235.9, 235.9, 235.8, 235.8, 235.8, 235.8, 235.8, 235.8, 235.8, 235.8, 235.8, 235.8, 235.8, 235.8, 235.8, 235.8, 235.8, 235.8, 235.8, 235.7, 235.7, 235.7, 235.7, 235.7, 235.7, 235.7, 235.7, 235.7, 235.7, 235.7, 235.7, 235.7, 235.7, 235.7, 235.7, 235.7, 235.7, 235.7, 235.7, 235.7, 235.7, 235.7, 235.7, 235.7, 235.7, 235.7, 235.7, 235.7, 235.7, 235.7, 235.7, 235.7, 235.7, 235.7, 235.7, 235.7, 235.7, 235.7, 235.7, 235.7, 235.7, 235.7, 235.7, 235.6, 235.6, 235.6, 235.6, 235.6, 235.6, 235.6, 235.6, 235.6, 235.6, 235.6, 235.6, 235.6, 235.6, 235.6, 235.6, 235.6, 235.5, 235.5, 235.5, 235.5, 235.5, 235.5, 235.5, 235.5, 235.4, 235.4, 235.4, 235.4, 235.4, 235.4, 235.4, 235.4, 235.4, 235.4, 235.4, 235.4, 235.4, 235.4, 235.4, 235.4, 235.4, 235.4, 235.4, 235.4, 235.4, 235.4, 235.4, 235.4]
+        };
+
+        const ranges = {
+            power: { min: 0, max: 12200, title: 'M/E Shaft Power (kW)' },
+            rpm: { min: 0.4, max: 65.2, title: 'M/E Shaft RPM' },
+            speed: { min: 15.0, max: 17.04, title: 'Ship Speed (knots)' },
+            heading: { min: 232.9, max: 237.9, title: 'Ship Heading (degrees)' }
+        };
+
+        const totalPoints = data.lat.length;
+        
+        // Define continuous custom color scale (Blue -> Green -> Yellow -> Orange -> Red)
+        const customColorscale = [
+            [0.0, '#00e5ff'],  // Cyan/Blue
+            [0.25, '#00e676'], // Neon Green
+            [0.5, '#ffd600'],  // Bright Yellow
+            [0.75, '#ff9100'], // Orange
+            [1.0, '#ff1744']   // Red
+        ];
+
+        // Format raw coordinates to degrees, minutes format (e.g. 24° 28.5316' N)
+        function formatGPS(coord, isLat) {
+            const dir = isLat ? (coord >= 0 ? 'N' : 'S') : (coord >= 0 ? 'E' : 'W');
+            const absCoord = Math.abs(coord);
+            const degrees = Math.floor(absCoord);
+            const minutes = ((absCoord - degrees) * 60).toFixed(4);
+            return `${degrees}° ${minutes}' ${dir}`;
+        }
+
+        // Format timestamps display timer
+        function formatDuration(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = seconds % 60;
+            return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        // Calculate a speed-based vector heading line
+        function getHeadingVector(index) {
+            const latStart = data.lat[index];
+            const lonStart = data.lon[index];
+            const speed = data.speed[index];
+            const heading = data.heading[index];
+            
+            // Speed vector represents projected distance in 30 seconds
+            // 30 seconds = 30 / 3600 hours = 1 / 120 hr
+            // d_nm = speed * (30/3600)
+            // d_deg = d_nm / 60 = speed * 30 / 216000
+            const lengthDeg = (speed * 30.0) / 216000.0;
+            const headingRad = (heading * Math.PI) / 180.0;
+            
+            const latEnd = latStart + lengthDeg * Math.cos(headingRad);
+            // Adjust longitude vector length by latitude cosine factor
+            const latCosine = Math.cos(latStart * Math.PI / 180.0);
+            const lonEnd = lonStart + (lengthDeg * Math.sin(headingRad)) / (latCosine || 1.0);
+            
+            return {
+                lat: [latStart, latEnd],
+                lon: [lonStart, lonEnd]
+            };
+        }
+
+        // Initialize scrubber range slider limits
+        const timeSlider = document.getElementById('time-slider');
+        timeSlider.max = totalPoints - 1;
+        document.getElementById('total-time-display').innerText = formatDuration(totalPoints - 1);
+
+        // State Machine Variables
+        let currentIndex = 0;
+        let isPlaying = false;
+        let playbackSpeed = 5; // Default speed: skips 5 frames per animation loop
+        let animationId = null;
+        let lastFrameTime = 0;
+        const targetFps = 30;
+        const frameInterval = 1000 / targetFps; // ~33ms
+
+        // Setup Traces for Plotly.js Map
+        // Trace 0: Thin subtle base track line showing the whole voyage
+        const traceBaseLine = {
+            type: 'scattermapbox',
+            lat: data.lat,
+            lon: data.lon,
+            mode: 'lines',
+            line: {
+                width: 1.5,
+                color: '#1e293b'
+            },
+            hoverinfo: 'none',
+            showlegend: false
+        };
+
+        // Trace 1: The colored points, using the selected metric
+        const traceColoredMarkers = {
+            type: 'scattermapbox',
+            lat: data.lat,
+            lon: data.lon,
+            mode: 'markers',
+            marker: {
+                size: 3.5,
+                color: data.power,
+                colorscale: customColorscale,
+                cmin: ranges.power.min,
+                cmax: ranges.power.max,
+                showscale: true,
+                colorbar: {
+                    title: {
+                        text: 'M/E Shaft Power (kW)',
+                        font: { color: '#e2e8f0', size: 11, family: 'Inter, sans-serif' }
+                    },
+                    tickfont: { color: '#94a3b8', size: 9, family: 'Roboto Mono, monospace' },
+                    thickness: 16,
+                    len: 0.55,
+                    x: 0.98,
+                    y: 0.5,
+                    yanchor: 'middle',
+                    bgcolor: 'rgba(11, 19, 30, 0.8)',
+                    bordercolor: '#1a2c3f',
+                    borderwidth: 1
+                }
+            },
+            // Custom hover info showing complete sensor profile
+            hovertemplate: 
+                '<b>Time:</b> %{text}<br>' +
+                '<b>Lat:</b> %{lat:.6f}°<br>' +
+                '<b>Lon:</b> %{lon:.6f}°<br>' +
+                '<b>Power:</b> %{customdata[0]:.1f} kW<br>' +
+                '<b>RPM:</b> %{customdata[1]:.1f}<br>' +
+                '<b>Speed:</b> %{customdata[2]:.2f} kt<br>' +
+                '<b>Heading:</b> %{customdata[3]:.1f}°<br>' +
+                '<extra></extra>',
+            text: data.timestamps.map(t => t.split('T')[1].replace('Z', ' UTC')),
+            customdata: data.power.map((p, i) => [p, data.rpm[i], data.speed[i], data.heading[i]]),
+            showlegend: false
+        };
+
+        // Trace 2: Start & End Markers
+        const traceStartEnd = {
+            type: 'scattermapbox',
+            lat: [data.lat[0], data.lat[totalPoints - 1]],
+            lon: [data.lon[0], data.lon[totalPoints - 1]],
+            mode: 'markers+text',
+            marker: {
+                size: 11,
+                color: ['#00e676', '#ff1744'],
+                symbol: 'circle'
+            },
+            text: ['START', 'END'],
+            textposition: 'top center',
+            textfont: {
+                color: '#f8fafc',
+                size: 10,
+                weight: 'bold',
+                family: 'Inter, sans-serif'
+            },
+            hoverinfo: 'none',
+            showlegend: false
+        };
+
+        // Trace 3: Active Vessel outer glowing aura
+        const traceVesselOuter = {
+            type: 'scattermapbox',
+            lat: [data.lat[0]],
+            lon: [data.lon[0]],
+            mode: 'markers',
+            marker: {
+                size: 18,
+                color: 'rgba(0, 229, 255, 0.4)',
+                symbol: 'circle'
+            },
+            hoverinfo: 'none',
+            showlegend: false
+        };
+
+        // Trace 4: Active Vessel inner center point
+        const traceVesselInner = {
+            type: 'scattermapbox',
+            lat: [data.lat[0]],
+            lon: [data.lon[0]],
+            mode: 'markers',
+            marker: {
+                size: 8,
+                color: '#ffffff',
+                symbol: 'circle'
+            },
+            hoverinfo: 'none',
+            showlegend: false
+        };
+
+        // Trace 5: Dynamic projected speed vector line
+        const initVec = getHeadingVector(0);
+        const traceHeadingVector = {
+            type: 'scattermapbox',
+            lat: initVec.lat,
+            lon: initVec.lon,
+            mode: 'lines',
+            line: {
+                width: 3.5,
+                color: '#00e5ff'
+            },
+            hoverinfo: 'none',
+            showlegend: false
+        };
+
+        const traces = [
+            traceBaseLine, 
+            traceColoredMarkers, 
+            traceStartEnd, 
+            traceVesselOuter, 
+            traceVesselInner, 
+            traceHeadingVector
+        ];
+
+        // Mapbox Layout definition
+        const layout = {
+            mapbox: {
+                style: 'open-street-map',
+                center: { lat: 24.443707348574687, lon: -80.02424874008108 },
+                zoom: 14.67
+            },
+            margin: { r: 0, t: 0, l: 0, b: 0 },
+            paper_bgcolor: '#060b11',
+            plot_bgcolor: '#060b11',
+            showlegend: false
+        };
+
+        const config = {
+            responsive: true,
+            displayModeBar: true,
+            modeBarButtonsToRemove: ['select2d', 'lasso2d']
+        };
+
+        // Render Initial Map
+        Plotly.newPlot('map-plot', traces, layout, config);
+
+        // Core animation updates for sidebar dashboard and map elements
+        function updateFrame(index) {
+            if (index < 0 || index >= totalPoints) return;
+            
+            currentIndex = index;
+            
+            // 1. Update timeline controls
+            timeSlider.value = index;
+            document.getElementById('elapsed-time-display').innerText = formatDuration(index);
+            
+            // 2. Update Sidebar telemetry cards (KPI values)
+            document.getElementById('kpi-power').innerText = data.power[index].toFixed(1);
+            document.getElementById('kpi-rpm').innerText = data.rpm[index].toFixed(1);
+            document.getElementById('kpi-speed').innerText = data.speed[index].toFixed(2);
+            document.getElementById('kpi-heading').innerText = data.heading[index].toFixed(1);
+            
+            // 3. Update coordinates and timestamp details
+            document.getElementById('kpi-lat').innerText = formatGPS(data.lat[index], true);
+            document.getElementById('kpi-lon').innerText = formatGPS(data.lon[index], false);
+            
+            const rawTime = data.timestamps[index];
+            // Format time cleanly (YYYY-MM-DD HH:MM:SS UTC)
+            const cleanTime = rawTime.replace('T', ' ').replace('Z', ' UTC');
+            document.getElementById('kpi-time').innerText = cleanTime;
+            
+            // 4. Calculate new projected speed heading vector
+            const vec = getHeadingVector(index);
+            
+            // 5. Restyle Plotly layers (Trace 3: Outer Vessel, Trace 4: Inner Vessel, Trace 5: Speed Vector)
+            Plotly.restyle('map-plot', {
+                lat: [[data.lat[index]]],
+                lon: [[data.lon[index]]]
+            }, [3, 4]);
+            
+            Plotly.restyle('map-plot', {
+                lat: [vec.lat],
+                lon: [vec.lon]
+            }, [5]);
+        }
+
+        // Loop animation method throttled to 30 FPS
+        function animate(timestamp) {
+            if (!isPlaying) return;
+            
+            if (!lastFrameTime) lastFrameTime = timestamp;
+            const elapsed = timestamp - lastFrameTime;
+            
+            if (elapsed >= frameInterval) {
+                // Ensure target rate alignment
+                lastFrameTime = timestamp - (elapsed % frameInterval);
+                
+                let nextIndex = currentIndex + playbackSpeed;
+                if (nextIndex >= totalPoints) {
+                    nextIndex = 0; // Infinite loop behavior
+                }
+                
+                updateFrame(nextIndex);
+            }
+            
+            animationId = requestAnimationFrame(animate);
+        }
+
+        // Play/Pause Action handling
+        const btnPlay = document.getElementById('btn-play');
+        const btnPause = document.getElementById('btn-pause');
+
+        function startPlayback() {
+            if (isPlaying) return;
+            isPlaying = true;
+            btnPlay.style.display = 'none';
+            btnPause.style.display = 'inline-flex';
+            lastFrameTime = 0; // Reset delta timer
+            animationId = requestAnimationFrame(animate);
+        }
+
+        function stopPlayback() {
+            if (!isPlaying) return;
+            isPlaying = false;
+            btnPlay.style.display = 'inline-flex';
+            btnPause.style.display = 'none';
+            if (animationId) {
+                cancelAnimationFrame(animationId);
+                animationId = null;
+            }
+        }
+
+        btnPlay.addEventListener('click', startPlayback);
+        btnPause.addEventListener('click', stopPlayback);
+        
+        document.getElementById('btn-reset').addEventListener('click', () => {
+            stopPlayback();
+            updateFrame(0);
+        });
+
+        // Timeline Slider user interactions
+        timeSlider.addEventListener('input', (e) => {
+            stopPlayback();
+            updateFrame(parseInt(e.target.value, 10));
+        });
+
+        // Playback Multiplier control buttons (speed factor range [1x, 100x])
+        const speedBadge = document.getElementById('speed-badge');
+        const speeds = [1, 2, 5, 10, 20, 50, 100];
+        let speedIdx = speeds.indexOf(playbackSpeed);
+
+        function updateSpeedDisplay() {
+            speedBadge.innerText = `${playbackSpeed}x`;
+        }
+
+        document.getElementById('btn-speed-up').addEventListener('click', () => {
+            if (speedIdx < speeds.length - 1) {
+                speedIdx++;
+                playbackSpeed = speeds[speedIdx];
+                updateSpeedDisplay();
+            }
+        });
+
+        document.getElementById('btn-speed-down').addEventListener('click', () => {
+            if (speedIdx > 0) {
+                speedIdx--;
+                playbackSpeed = speeds[speedIdx];
+                updateSpeedDisplay();
+            }
+        });
+
+        // Dropdown Recoloring event handler
+        const colorBySelect = document.getElementById('color-by-select');
+        colorBySelect.addEventListener('change', (e) => {
+            const metric = e.target.value;
+            let values = [];
+            const r = ranges[metric];
+            
+            if (metric === 'power') values = data.power;
+            else if (metric === 'rpm') values = data.rpm;
+            else if (metric === 'speed') values = data.speed;
+            else if (metric === 'heading') values = data.heading;
+            
+            // Recolor Trace 1 (the colored track marker trace) and update colorbar title/ranges
+            Plotly.restyle('map-plot', {
+                'marker.color': [values],
+                'marker.cmin': [r.min],
+                'marker.cmax': [r.max],
+                'marker.colorbar.title.text': [r.title]
+            }, [1]);
+        });
+
+        // Map Style Changer dropdown handler
+        const mapStyleSelect = document.getElementById('map-style-select');
+        mapStyleSelect.addEventListener('change', (e) => {
+            const style = e.target.value;
+            Plotly.relayout('map-plot', {
+                'mapbox.style': style
+            });
+        });
+
+        // Load initial state for frame index 0 on startup
+        updateFrame(0);
+
+    </script>
+</body>
+</html>
